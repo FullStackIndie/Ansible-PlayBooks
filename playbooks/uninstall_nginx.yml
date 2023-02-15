@@ -1,0 +1,17 @@
+- hosts: all
+  become: true
+  tasks:
+
+    - name: Uninstall Nginx GeoIP2 MaxMind Packages
+      apt:
+        pkg:
+        - python3-certbot-nginx 
+        - certbot
+        - nginx
+        - geoipupdate 
+        - libmaxminddb0 
+        - libmaxminddb-dev
+        - mmdb-bin
+        state: absent
+        update_cache: true
+        autoremove: yes

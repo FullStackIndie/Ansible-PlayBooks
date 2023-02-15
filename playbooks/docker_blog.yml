@@ -1,0 +1,66 @@
+- hosts: a2hosting
+  become: true
+  vars:
+    domains:
+      - blog.fullstackindie.net
+      # fullstackindie.net
+  tasks:
+    - name: Log into private registry and force re-authorization
+      community.docker.docker_login:
+        registry_url: https://index.docker.io/v2
+        username: "{{ docker_username }}"
+        password: "{{ docker_password }}"
+        reauthorize: true
+
+    - name: Create a Docker network
+      community.docker.docker_network:
+        name: telemetry
+
+    - name: Create required Dirs for Docker Compose
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: devops
+        mode: 0755
+      loop:
+        # - { "path": "/home/devops/workspace" }
+        # - { "path": "/home/devops/workspace/compose" }
+        - { "path": "/home/devops/workspace/compose/blog" }
+
+    - name: Copy Blog Compose Configs
+      ansible.builtin.copy:
+        src: /home/murph/workspace/compose/blog/blog.yml
+        dest: /home/devops/workspace/compose/blog/docker-compose.yml
+        force: true
+        backup: true
+        owner: root
+        mode: 0755
+
+    # - name: Register certbot
+    #   shell: pip install docker-compose
+
+    # - name: Uninstall and Reinstall docker-compose
+    #   shell: pip uninstall -y docker docker-py docker-compose && pip install docker-compose
+    - name: Tear down existing services
+      community.docker.docker_compose:
+        project_src: /home/devops/workspace/compose/blog
+        state: absent
+
+    - name: Create and start blog
+      community.docker.docker_compose:
+        project_src: /home/devops/workspace/compose/blog
+        build: true
+        pull: true
+
+    # - name: Create required Nginx dirs
+    #   ansible.builtin.file:
+    #     path: "{{ item.path }}"
+    #     state: directory
+    #     owner: root
+    #     mode: 0755
+    #   loop:
+    #     - { "path": "/etc/nginx/conf.d" }
+    #     # - { "path": "/etc/nginx/conf.d/streams" }
+    #     - { "path": "/etc/nginx/modules-enabled" }
+    #     - { "path": "/etc/nginx/modules-available" }
+    #     - { "path": "/etc/nginx/open-telemetry" }

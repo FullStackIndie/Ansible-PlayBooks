@@ -1,0 +1,8 @@
+[a2hosting]
+server1 ansible_host="{{ server1_ip }}"
+
+[all:vars]
+ansible_python_interpreter=/usr/bin/python3
+
+[a2hosting:vars]
+ansible_ssh_private_key_file=/home/murph/.ssh/id_a2hosting_server1

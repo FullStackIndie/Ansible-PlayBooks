@@ -1,0 +1,70 @@
+- hosts: a2hosting
+  become: true
+  vars:
+    frp_version: 0.47.0
+    frp_folder: "frp_{{ frp_version }}"
+    frp_install_dir: "/opt/{{ frp_folder }}"
+
+  tasks:
+    - name: Create required FRP dirs to Compile needed Modules
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: devops
+        mode: 0755
+      loop:
+        - { "path": "{{ frp_install_dir }}" }
+
+    - name: Downloading NGINX source
+      get_url:
+        url: "https://github.com/fatedier/frp/releases/download/v{{ frp_version }}/frp_{{ frp_version }}_linux_amd64.tar.gz"
+        dest: "{{ frp_install_dir }}/{{ frp_folder }}.tar.gz"
+      register: frp_source
+
+    - name: Unpacking FRP Proxy
+      unarchive:
+        copy: false
+        dest: "{{ frp_install_dir }}"
+        src: "{{ frp_source.dest }}"
+        owner: root
+      when: frp_source.changed
+
+    - name: Copy FRP Proxy Service
+      ansible.builtin.copy:
+        src: /home/murph/workspace/frp/frps.service
+        dest: /etc/systemd/system/
+        force: true
+        owner: root
+        mode: 0755
+
+    - name: Copy FRP Proxy Configs
+      ansible.builtin.copy:
+        src: /home/murph/workspace/frp/frps.ini
+        dest: "{{ frp_install_dir }}/frp_0.47.0_linux_amd64/"
+        force: true
+        backup: true
+        owner: root
+        mode: 0755
+
+    - name: Open FRP ports and reload UFW
+      become: true
+      shell: |
+       sudo ufw allow 7000 && 
+       sudo ufw allow 5433 && 
+       sudo ufw reload
+
+    - name: Enable service FRP Proxy and ensure it is not masked
+      ansible.builtin.systemd:
+        name: frps
+        enabled: true
+        masked: no
+
+    - name: Just force systemd to reread configs (2.4 and above)
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: Make sure FRP Proxy service unit is running
+      ansible.builtin.systemd:
+        daemon_reload: true
+        state: started
+        name: frps

@@ -1,0 +1,167 @@
+- hosts: a2hosting
+  become: true
+  vars:
+    nginx_version: nginx-1.18.0
+    nginx_tarball_url: "http://nginx.org/download/{{ nginx_version }}.tar.gz"
+    nginx_install_dir: "/home/devops/nginx_compiled"
+    nginx_sbin_path: "/usr/sbin/nginx"
+    nginx_conf_path: "/etc/nginx/nginx.conf"
+    nginx_prefix: "/usr/local/nginx"
+    pcre: pcre-8.45
+    zlib: zlib-1.2.13
+    openssl: openssl-1.1.1s
+
+  tasks:
+    - name: Create required Nginx dirs to Compile needed Modules
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: devops
+        mode: 0755
+      loop:
+        - { "path": "{{ nginx_install_dir }}" }
+        - { "path": "{{ nginx_install_dir }}/{{ pcre }}" }
+        - { "path": "{{ nginx_install_dir }}/{{ zlib }}" }
+        - { "path": "{{ nginx_install_dir }}/{{ openssl }}" }
+        - { "path": "{{ nginx_install_dir }}/geoip2" }
+        - { "path": "{{ nginx_install_dir }}/brotli" }
+
+    - name: Downloading NGINX source
+      get_url:
+        url: "{{ nginx_tarball_url }}"
+        dest: "{{ nginx_install_dir }}/{{ nginx_version }}.tar.gz"
+      register: nginx_source
+
+    - name: Downloading PCRE source
+      get_url:
+        url: "https://sourceforge.net/projects/pcre/files/pcre/8.45/pcre-8.45.tar.gz/download"
+        dest: "{{ nginx_install_dir }}/{{ pcre }}.tar.gz"
+      register: pcre_source
+
+    - name: Downloading Zlib source
+      get_url:
+        url: "http://zlib.net/zlib-1.2.13.tar.gz"
+        dest: "{{ nginx_install_dir }}/{{ zlib }}.tar.gz"
+      register: zlib_source
+
+    - name: Downloading OpenSSL source
+      get_url:
+        url: "https://github.com/openssl/openssl/releases/download/OpenSSL_1_1_1s/openssl-1.1.1s.tar.gz"
+        dest: "{{ nginx_install_dir }}/{{ openssl }}.tar.gz"
+      register: openssl_source
+
+    - name: Clone Brotli source
+      git:
+        repo: "https://github.com/google/ngx_brotli.git"
+        dest: "{{ nginx_install_dir }}/brotli"
+        clone: yes
+        update: yes
+      register: brotli_source
+
+    - name: Add MaxMind Repository
+      apt_repository:
+        repo: ppa:maxmind/ppa
+        state: present
+        update_cache: true
+
+    - name: Install MaxMind neccessary Packages
+      apt:
+        pkg:
+          - geoipupdate
+          - libmaxminddb0
+          - libmaxminddb-dev
+          - mmdb-bin
+        state: latest
+        update_cache: true
+      tags: ["max-mind"]
+
+
+    - name: Clone GeoIP2 repository
+      git:
+        repo: "https://github.com/leev/ngx_http_geoip2_module.git"
+        dest: "{{ nginx_install_dir }}/geoip2"
+        clone: yes
+        update: yes
+      register: geoip2_source
+
+    - name: Unpacking NGINX
+      unarchive:
+        copy: false
+        dest: "{{ nginx_install_dir }}"
+        src: "{{ nginx_source.dest }}"
+        creates: "{{ nginx_version }}"
+        owner: devops
+      when: nginx_source.changed
+      register: nginx_source_unpack
+
+    - name: Unpacking PCRE
+      unarchive:
+        copy: false
+        dest: "{{ nginx_install_dir }}"
+        src: "{{ pcre_source.dest }}"
+        creates: "{{ pcre }}"
+        owner: devops
+      when: pcre_source.changed
+      register: pcre_source_unpack
+
+    - name: Unpacking ZLib
+      unarchive:
+        copy: false
+        dest: "{{ nginx_install_dir }}"
+        src: "{{ zlib_source.dest }}"
+        creates: "{{ zlib }}"
+        owner: devops
+      when: zlib_source.changed
+      register: zlib_source_unpack
+
+    - name: Unpacking OpenSSL
+      unarchive:
+        copy: false
+        dest: "{{ nginx_install_dir }}"
+        src: "{{ openssl_source.dest }}"
+        creates: "{{ openssl }}"
+        owner: devops
+      when: openssl_source.changed
+      register: openssl_source_unpack
+
+    - name: Installing PCRE 
+      become: true
+      shell: ./configure && make -j2 && sudo make install
+      args:
+        chdir: "{{ nginx_install_dir }}/{{ pcre }}"
+
+    - name: Installing ZLib
+      become: true
+      shell: ./configure && make -j2 && sudo make install
+      args:
+        chdir: "{{ nginx_install_dir }}/{{ zlib }}"
+
+    - name: Installing OpenSSL 
+      become: true
+      shell: ./Configure linux-x86_64 --prefix=/usr && make -j2 && sudo make install
+      args:
+        chdir: "{{ nginx_install_dir }}/{{ openssl }}"
+
+    - name: Configuring NGINX source with custom modules
+      become: true
+      shell: ./configure --with-cc-opt='-g -O2 -flto=auto -ffat-lto-objects -flto=auto -ffat-lto-objects -fstack-protector-strong -Wformat -Werror=format-security -fPIC -Wdate-time -D_FORTIFY_SOURCE=2' --with-ld-opt='-Wl,-Bsymbolic-functions -flto=auto -ffat-lto-objects -flto=auto -Wl,-z,relro -Wl,-z,now -fPIC -lpcre' --prefix={{ nginx_prefix }} --sbin-path={{ nginx_sbin_path }}  --conf-path={{ nginx_conf_path }} --http-log-path=/var/log/nginx/access.log --error-log-path=/var/log/nginx/error.log --lock-path=/var/lock/nginx.lock --pid-path=/run/nginx.pid --modules-path=/usr/local/nginx/modules --with-zlib=../zlib-1.2.13 --with-pcre=../pcre-8.45 --http-client-body-temp-path=/var/lib/nginx/body --http-fastcgi-temp-path=/var/lib/nginx/fastcgi --http-proxy-temp-path=/var/lib/nginx/proxy --http-scgi-temp-path=/var/lib/nginx/scgi --http-uwsgi-temp-path=/var/lib/nginx/uwsgi --with-compat --with-debug --with-pcre-jit --with-http_ssl_module --with-http_stub_status_module --with-http_realip_module --with-http_auth_request_module --with-http_v2_module --with-http_dav_module --with-http_slice_module --with-threads --add-dynamic-module=../geoip2 --with-http_addition_module --with-http_gunzip_module --with-http_gzip_static_module --with-http_sub_module --with-stream=dynamic --with-stream_ssl_module --add-dynamic-module=../brotli
+      args:
+        chdir: "{{ nginx_install_dir }}/{{ nginx_version }}"
+      register: nginx_configured
+
+    - name: Installing NGINX
+      become: true
+      shell: make -j2 && sudo make install
+      args:
+        chdir: "{{ nginx_install_dir }}/{{ nginx_version }}"
+      when: nginx_configured.changed
+      register: nginx_installed
+
+    - name: Delete unnecessary tar.gz folders
+      file:
+        state: absent
+        path: "{{ item.path }}"
+      with_items:
+        - { path: "{{ nginx_install_dir }}/*.gz" }
+
+

@@ -1,0 +1,85 @@
+- hosts: all
+  become: true
+  tasks:
+    - name: Install Aptitude Package Manager for Ansible
+      apt:
+        name: aptitude
+        state: latest
+        update_cache: true
+
+    - name: Install Nginx, UFW, and Workflow Packages
+      apt:
+        pkg:
+          - curl
+          - nginx
+          - nano
+          - ufw
+          - jq
+          - certbot
+          - python3-certbot-nginx
+        state: latest
+        update_cache: true
+      tags: ["setup"]
+
+    - name: Install Required Packages for Docker
+      apt:
+        pkg:
+          - apt-transport-https
+          - ca-certificates
+          - software-properties-common
+          - python3-pip
+          - virtualenv
+          - python3-setuptools
+        state: latest
+        update_cache: true
+      tags: ["setup"]
+
+    - name: Add Docker GPG apt Key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker Repository
+      apt_repository:
+        repo: deb https://download.docker.com/linux/ubuntu jammy stable
+        state: present
+
+    - name: Update apt and install docker-ce
+      apt:
+        name: docker-ce
+        state: latest
+        update_cache: true
+
+    - name: Install Docker Module for Python
+      pip:
+        name: docker
+
+    - name: Check if Docker is active
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Ensure group "docker" exists
+      ansible.builtin.group:
+        name: docker
+        state: present
+
+    - name: Adding user "devops" to Docker Group
+      user:
+        name: devops
+        groups: docker
+        append: yes
+
+    - name: Install docker-compose
+      get_url:
+        url: https://github.com/docker/compose/releases/download/v2.15.1/docker-compose-linux-x86_64
+        dest: /usr/local/bin/docker-compose
+        mode: "u+x,g+x"
+
+    - name: Change file ownership, group and permissions
+      ansible.builtin.file:
+        path: /usr/local/bin/docker-compose
+        owner: devops
+        group: devops
+
