@@ -1,9 +1,6 @@
 - hosts: a2hosting
   become: true
-  vars:
-    domains:
-      - blog.fullstackindie.net
-      # fullstackindie.net
+  
   tasks:
     - name: Log into private registry and force re-authorization
       community.docker.docker_login:
@@ -23,8 +20,6 @@
         owner: devops
         mode: 0755
       loop:
-        # - { "path": "/home/devops/workspace" }
-        # - { "path": "/home/devops/workspace/compose" }
         - { "path": "/home/devops/workspace/compose/blog" }
 
     - name: Copy Blog Compose Configs
@@ -36,11 +31,10 @@
         owner: root
         mode: 0755
 
-    # - name: Register certbot
-    #   shell: pip install docker-compose
-
+    # if error using docker -compose uncomment this out and run once and re-comment out
     # - name: Uninstall and Reinstall docker-compose
     #   shell: pip uninstall -y docker docker-py docker-compose && pip install docker-compose
+
     - name: Tear down existing services
       community.docker.docker_compose:
         project_src: /home/devops/workspace/compose/blog

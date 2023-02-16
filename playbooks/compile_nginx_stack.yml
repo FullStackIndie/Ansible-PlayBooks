@@ -1,7 +1,7 @@
 - hosts: a2hosting
   become: true
   vars:
-    nginx_version: nginx-1.18.0
+    nginx_version: nginx-1.18.0 # Required version to use Nginx OpenTelemetry Contrib
     nginx_tarball_url: "http://nginx.org/download/{{ nginx_version }}.tar.gz"
     nginx_install_dir: "/home/devops/nginx_compiled"
     nginx_sbin_path: "/usr/sbin/nginx"
@@ -156,12 +156,4 @@
         chdir: "{{ nginx_install_dir }}/{{ nginx_version }}"
       when: nginx_configured.changed
       register: nginx_installed
-
-    - name: Delete unnecessary tar.gz folders
-      file:
-        state: absent
-        path: "{{ item.path }}"
-      with_items:
-        - { path: "{{ nginx_install_dir }}/*.gz" }
-
 
