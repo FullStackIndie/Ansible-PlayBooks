@@ -33,6 +33,25 @@
         state: latest
         update_cache: true
 
+    - name: Copy Crowdsec Nginx Bouncer configuration for Captcha
+      ansible.builtin.copy:
+        src: /home/murph/workspace/crowdsec/crowdsec-nginx-bouncer.conf
+        dest: /etc/crowdsec/bouncers/crowdsec-nginx-bouncer.conf
+        force: true
+        backup: true
+        owner: root
+        mode: 0755
+
+    - name: Copy Crowdsec Profile for Captcha
+      ansible.builtin.copy:
+        src: /home/murph/workspace/crowdsec/profiles.yaml
+        dest: /etc/crowdsec/profiles.yaml
+        force: true
+        backup: true
+        owner: root
+        mode: 0755
+
+
     - name: Restart Crowdsec service
       ansible.builtin.systemd:
         daemon_reload: true

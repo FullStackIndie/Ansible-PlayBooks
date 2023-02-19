@@ -22,6 +22,7 @@
         - { "path": "/etc/nginx/modules-enabled" }
         - { "path": "/etc/nginx/modules-available" }
         - { "path": "/etc/nginx/open-telemetry" }
+        - { "path": "/etc/apache2" }
 
     - name: Copy Otel config for Nginx Open Telemetry
       ansible.builtin.copy:
@@ -66,6 +67,15 @@
         force: true
         owner: root
         mode: 0755
+
+    - name: Copy Naxsi Rules
+      ansible.builtin.copy:
+        src: /home/murph/workspace/nginx/naxsi/naxsi.rules
+        dest: /etc/nginx
+        force: true
+        owner: root
+        mode: 0755
+
 
     - name: Copy Nginx Service
       ansible.builtin.copy:
@@ -137,14 +147,13 @@
       ignore_errors: true
       loop: "{{ domains }}"
 
-    - name: Remove Apache
+    - name: Remove Apache because it also uses port 80
       apt:
         pkg:
           - apache2
           - apache2-bin
           - apache2-data
           - apache2-doc
-          - apache2-utils
         state: absent
         purge: true
         update_cache: true
@@ -159,3 +168,14 @@
       ansible.builtin.systemd:
         state: restarted
         name: nginx
+
+    - name: Apache Utils for Nginx Basic Auth
+      apt:
+        pkg:
+          - apache2-utils
+        state: latest
+        update_cache: true
+
+    - name: Setup FullStackIndie Admin Dashboard Password
+      become: true
+      command: 'sudo htpasswd -c /etc/apache2/.htpasswd {{ fullstackindie_admin_dashboard_password }}'

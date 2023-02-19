@@ -18,3 +18,6 @@
       command: 'sudo ufw {{ item }}'
       loop: "{{ rules }}"
 
+    - name: Reload UFW filewall
+      become: true
+      command: 'sudo ufw reload'
