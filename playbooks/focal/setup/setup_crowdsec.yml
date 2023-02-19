@@ -55,3 +55,9 @@
       become: true
       shell: |
         sudo cscli dashboard setup --yes --password "{{ crowdsec_metabase_password }}"
+
+    - name: Setup and Start Crowdsec Local Metrics Dashboard
+      become: true
+      shell: |
+        docker update --restart=always crowdsec-metabase
+    

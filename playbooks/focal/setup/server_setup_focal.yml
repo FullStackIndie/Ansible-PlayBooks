@@ -7,13 +7,14 @@
         state: latest
         update_cache: true
 
-    - name: Install ufw, curl, nano, jq
+    - name: Install Firewall and Workflow tools
       apt:
         pkg:
           - curl
           - nano
           - ufw
           - jq
+          - bash-completion
         state: latest
         update_cache: true
       tags: ["setup"]

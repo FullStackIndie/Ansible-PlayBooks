@@ -13,24 +13,6 @@
       community.docker.docker_network:
         name: telemetry
 
-    - name: Create required Dirs for Docker Compose
-      ansible.builtin.file:
-        path: "{{ item.path }}"
-        state: directory
-        owner: devops
-        mode: 0755
-      loop:
-        - { "path": "/home/devops/workspace/compose/blog" }
-
-    - name: Copy Blog Compose Configs
-      ansible.builtin.copy:
-        src: /home/murph/workspace/compose/blog/blog.yml
-        dest: /home/devops/workspace/compose/blog/docker-compose.yml
-        force: true
-        backup: true
-        owner: root
-        mode: 0755
-
     # if error using docker -compose uncomment this out and run once and re-comment out
     # - name: Uninstall and Reinstall docker-compose
     #   shell: pip uninstall -y docker docker-py docker-compose && pip install docker-compose

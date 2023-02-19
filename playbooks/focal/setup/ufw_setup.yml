@@ -1,0 +1,20 @@
+- hosts: a2hosting
+  become: true
+  vars:
+    rules:
+      - deny out 25 # deny mail server traffic 
+      - allow 80 # http
+      - allow 443 # https
+      - allow 7822 # A2 Hosting SSH port
+      - allow 53 # GeoIp Update - uses DNS port
+      - allow 7000 # frp proxy server 
+      - allow 5433 # traffic thru nginx proxied to frp postgres
+      - allow 4319 # traffic thru nginx proxied to frp otel-collector
+      - allow 6380 # traffic thru nginx proxied to frp redis
+
+  tasks:
+    - name: Register UFW filewall rules
+      become: true
+      command: 'sudo ufw {{ item }}'
+      loop: "{{ rules }}"
+
