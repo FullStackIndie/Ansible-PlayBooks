@@ -1,3 +1,4 @@
+
 [a2hosting]
 server1 ansible_host="{{ server1_ip }}"
 

@@ -7,7 +7,7 @@
         src: /home/murph/workspace/nginx/otelcollector/otel_config.toml
         dest: /etc/nginx/open-telemetry
         force: true
-        backup: true
+        backup: false
         owner: root
         mode: 0755
 
@@ -16,7 +16,7 @@
         src: /home/murph/workspace/nginx/otelcollector/otel_ngx_module.so
         dest: /usr/local/nginx/modules
         force: true
-        backup: true
+        backup: false
         owner: root
         mode: 0755
 
@@ -25,7 +25,7 @@
         src: /home/murph/workspace/nginx/nginx.conf
         dest: /etc/nginx
         force: true
-        backup: true
+        backup: false
         owner: root
         mode: 0755
 
@@ -34,7 +34,16 @@
         src: /home/murph/workspace/nginx/conf.d/
         dest: /etc/nginx/conf.d/
         force: true
-        backup: true
+        backup: false
+        owner: root
+        mode: 0755
+
+    - name: Copy Portfolio configs
+      ansible.builtin.copy:
+        src: /home/murph/workspace/nginx/conf.d/portfolio/challenges/
+        dest: /etc/nginx/conf.d/portfolio/challenges/
+        force: true
+        backup: false
         owner: root
         mode: 0755
 
@@ -60,7 +69,7 @@
         src: /home/murph/workspace/nginx/GeoIP.conf
         dest: /etc/GeoIP.conf
         force: true
-        backup: true
+        backup: false
         owner: root
         mode: 0755
 
