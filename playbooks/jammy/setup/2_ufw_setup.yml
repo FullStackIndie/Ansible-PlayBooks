@@ -13,11 +13,15 @@
       - allow 6380 # traffic thru nginx proxied to frp redis
 
   tasks:
+    - name: EnableUFW filewall
+      become: true
+      command: 'ufw enable'
+
     - name: Register UFW filewall rules
       become: true
-      command: 'sudo ufw {{ item }}'
+      command: 'ufw {{ item }}'
       loop: "{{ rules }}"
 
     - name: Reload UFW filewall
       become: true
-      command: 'sudo ufw reload'
+      command: 'ufw reload'

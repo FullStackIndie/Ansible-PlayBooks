@@ -1,0 +1,29 @@
+- hosts: a2hosting
+  become: true
+  
+  tasks:
+    - name: Log into private registry and force re-authorization
+      community.docker.docker_login:
+        registry_url: https://index.docker.io/v2
+        username: "{{ docker_username }}"
+        password: "{{ docker_password }}"
+        reauthorize: true
+
+    - name: Create a Docker network
+      community.docker.docker_network:
+        name: telemetry
+
+    # if error using docker -compose uncomment this out and run once and re-comment out
+    # - name: Uninstall and Reinstall docker-compose
+    #   shell: pip uninstall -y docker docker-py docker-compose && pip install docker-compose
+
+    - name: Tear down existing services
+      community.docker.docker_compose:
+        project_src: /home/devops/workspace/compose/blog
+        state: absent
+
+    - name: Create and start blog
+      community.docker.docker_compose:
+        project_src: /home/devops/workspace/compose/blog
+        build: true
+        pull: true

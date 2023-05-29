@@ -1,0 +1,31 @@
+- hosts: a2hosting,localhost
+  become: true
+  vars:
+    compose_base_path: "/home/murph/workspace/compose"
+    dest_path: "/home/devops/workspace/compose"
+
+  tasks:
+    - name: Create required Dirs for Docker Compose
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: devops
+        mode: 0755
+      loop:
+        - { "path": "/home/devops/workspace/compose/blog" }
+        - { "path": "/home/devops/workspace/compose/identity" }
+        - { "path": "/home/devops/workspace/compose/email-api" }
+
+    - name: Copy Blog Compose Configs
+      ansible.builtin.copy:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        force: true
+        backup: true
+        owner: root
+        mode: 0755
+      loop:
+        - { "src": "{{ compose_base_path }}/blog/blog.yml", "dest": "{{ dest_path }}/blog/blog.yml" }   
+        - { "src": "{{ compose_base_path }}/identity/identity.yml", "dest": "{{ dest_path }}/identity/identity.yml" }   
+        - { "src": "{{ compose_base_path }}/email-api/email-api.yml", "dest": "{{ dest_path }}/email-api/email-api.yml" }   
+

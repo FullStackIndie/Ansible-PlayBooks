@@ -1,26 +1,6 @@
-- hosts: all
+- hosts: a2hosting,localhost
   become: true
   tasks:
-    - name: Install Aptitude Package Manager for Ansible
-      apt:
-        name: aptitude
-        state: latest
-        update_cache: true
-
-    - name: Install Nginx, UFW, and Workflow Packages
-      apt:
-        pkg:
-          - curl
-          - nginx
-          - nano
-          - ufw
-          - jq
-          - certbot
-          - python3-certbot-nginx
-        state: latest
-        update_cache: true
-      tags: ["setup"]
-
     - name: Install Required Packages for Docker
       apt:
         pkg:
@@ -41,7 +21,7 @@
 
     - name: Add Docker Repository
       apt_repository:
-        repo: deb https://download.docker.com/linux/ubuntu jammy stable
+        repo: deb https://download.docker.com/linux/ubuntu focal stable
         state: present
 
     - name: Update apt and install docker-ce
@@ -83,3 +63,6 @@
         owner: devops
         group: devops
 
+    - name: Restart to enable sudo for Docker - can also logout I think but rebooting by choice
+      become: true
+      shell: sudo reboot

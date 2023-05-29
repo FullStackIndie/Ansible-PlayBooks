@@ -1,0 +1,17 @@
+- name: Run multiple playbooks
+  hosts: localhost
+  tasks:
+    - name: Setup Nginx, Naxsi
+      import_playbook: ~/ansible/playbooks/jammy/setup/3_compile_nginx_stack.yml
+
+    - name: Setup Server Tools
+      import_playbook: ~/ansible/playbooks/jammy/setup/3_server_tools_setup.yml
+
+    - name: Setup Docker and Docker Compose
+      import_playbook: ~/ansible/playbooks/jammy/setup/3_docker_setup.yml
+
+    - name: Setup FRP Proxy
+      import_playbook: ~/ansible/playbooks/jammy/setup/3_setup_frp.yml
+
+    - name: Setup Doppler
+      import_playbook: ~/ansible/playbooks/jammy/setup/3_setup_doppler.yml

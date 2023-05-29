@@ -1,0 +1,77 @@
+- hosts: a2hosting,localhost
+  become: true
+  tasks:
+    - name: Add Crowdsec Repo's
+      become: true
+      shell: curl -s https://packagecloud.io/install/repositories/crowdsec/crowdsec/script.deb.sh | sudo bash
+      args:
+        chdir: /home/devops/
+        
+    
+    - name: Install Crowdsec and Bouncer Dependencies
+      ansible.builtin.apt:
+        pkg:
+          - crowdsec
+          - lua5.1 
+          - libnginx-mod-http-lua 
+          - luarocks 
+          - gettext-base 
+          - lua-cjson
+        state: latest
+        update_cache: true
+
+    - name: Install Crowdsec Bouncers
+      ansible.builtin.apt:
+        pkg:
+          - crowdsec-firewall-bouncer-iptables
+          - crowdsec-nginx-bouncer
+        state: latest
+        update_cache: true
+
+    - name: Copy Crowdsec Nginx Bouncer configuration for Captcha
+      ansible.builtin.copy:
+        src: /home/murph/workspace/crowdsec/crowdsec-nginx-bouncer.conf
+        dest: /etc/crowdsec/bouncers/crowdsec-nginx-bouncer.conf
+        force: true
+        backup: true
+        owner: root
+        mode: 0755
+
+    - name: Copy Crowdsec Profile for Captcha
+      ansible.builtin.copy:
+        src: /home/murph/workspace/crowdsec/profiles.yaml
+        dest: /etc/crowdsec/profiles.yaml
+        force: true
+        backup: true
+        owner: root
+        mode: 0755
+
+
+    - name: Restart Crowdsec service
+      ansible.builtin.systemd:
+        daemon_reload: true
+        state: restarted
+        name: crowdsec
+        
+    - name: Restart Crowsec Firewall Bouncer
+      ansible.builtin.systemd:
+        daemon_reload: true
+        state: restarted
+        name: crowdsec-firewall-bouncer
+
+    - name: Restart Nginx service
+      ansible.builtin.systemd:
+        daemon_reload: true
+        state: restarted
+        name: nginx
+
+    - name: Setup and Start Crowdsec Local Metrics Dashboard
+      become: true
+      shell: |
+        sudo cscli dashboard setup --yes --password "{{ crowdsec_metabase_password }}"
+
+    - name: Setup and Start Crowdsec Local Metrics Dashboard
+      become: true
+      shell: |
+        docker update --restart=always crowdsec-metabase
+    

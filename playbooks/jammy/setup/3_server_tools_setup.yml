@@ -1,0 +1,20 @@
+- hosts: a2hosting,localhost
+  become: true
+  tasks:
+    - name: Install Aptitude Package Manager for Ansible
+      apt:
+        name: aptitude
+        state: latest
+        update_cache: true
+
+    - name: Install Firewall and Workflow tools
+      apt:
+        pkg:
+          - curl
+          - nano
+          - ufw
+          - jq
+          - bash-completion
+        state: latest
+        update_cache: true
+      tags: ["setup"]
