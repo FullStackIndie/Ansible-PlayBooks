@@ -1,0 +1,184 @@
+- hosts: a2hosting,localhost
+  become: true
+  vars:
+    nginx_version: nginx-1.24.0 # Required version to use Nginx OpenTelemetry Contrib
+    nginx_tarball_url: "http://nginx.org/download/{{ nginx_version }}.tar.gz"
+    nginx_install_dir: "/home/{{ user }}/nginx_compiled"
+    nginx_sbin_path: "/usr/sbin/nginx"
+    nginx_conf_path: "/etc/nginx/nginx.conf"
+    nginx_prefix: "/usr/local/nginx"
+    naxsi: naxsi_1.3
+    ndk: ndk
+    ngx_lua: ngx_lua
+    user: murph
+
+  tasks:
+  
+    - name: Install Required Packages for Nginx Download
+      apt:
+        pkg:
+          - curl 
+          - gnupg2 
+          - ca-certificates 
+          - lsb-release 
+          - ubuntu-keyring
+        state: latest
+        update_cache: true
+      tags: ["setup"]
+
+    - name: Import an official nginx signing key so apt could verify the packages authenticity
+      become: true
+      shell: curl https://nginx.org/keys/nginx_signing.key | gpg --dearmor | sudo tee /usr/share/keyrings/nginx-archive-keyring.gpg >/dev/null
+
+    - name: Verify that the downloaded file contains the proper key
+      become: true
+      shell: gpg --dry-run --quiet --no-keyring --import --import-options import-show /usr/share/keyrings/nginx-archive-keyring.gpg
+
+    - name: Set up the apt repository for stable nginx packages
+      become: true
+      shell: >
+        echo "deb [signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] http://nginx.org/packages/ubuntu `lsb_release -cs` nginx" 
+        | sudo tee /etc/apt/sources.list.d/nginx.list
+
+    - name: Set up repository pinning to prefer our Nginx packages over distribution-provided ones
+      become: true
+      shell: >
+        echo "Package: *\nPin: origin nginx.org\nPin: release o=nginx\nPin-Priority: 900\n" | sudo tee /etc/apt/preferences.d/99nginx
+
+    - name: Install Required Packages for Nginx and OpenSSL
+      apt:
+        pkg:
+          - build-essential
+          - libpcre3 
+          - libpcre3-dev 
+          - zlib1g 
+          - zlib1g-dev 
+          - libssl-dev
+        state: latest
+        update_cache: true
+      tags: ["setup"]
+
+    - name: Install Nginx
+      apt:
+        pkg:
+          - nginx 
+        state: latest
+        update_cache: true
+      tags: ["setup"]
+
+    - name: Create required Nginx dirs to Compile needed Modules
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: "{{ user }}"
+        mode: 0755
+      loop:
+        - { "path": "{{ nginx_install_dir }}" }
+        - { "path": "{{ nginx_install_dir }}/geoip2" }
+        - { "path": "{{ nginx_install_dir }}/brotli" }
+        - { "path": "{{ nginx_install_dir }}/{{ naxsi }}" }
+
+    - name: Downloading NGINX source
+      get_url:
+        url: "{{ nginx_tarball_url }}"
+        dest: "{{ nginx_install_dir }}/{{ nginx_version }}.tar.gz"
+      register: nginx_source
+
+    - name: Clone Brotli source
+      git:
+        repo: "https://github.com/google/ngx_brotli.git"
+        dest: "{{ nginx_install_dir }}/brotli"
+        clone: yes
+        update: yes
+      register: brotli_source
+
+    # - name: Downloading Naxsi source
+    #   get_url:
+    #     url: "https://github.com/nbs-system/naxsi/archive/1.3.tar.gz"
+    #     dest: "{{ nginx_install_dir }}/{{ naxsi }}.tar.gz"
+    #   register: naxsi_source
+
+    - name: Add MaxMind Repository
+      apt_repository:
+        repo: ppa:maxmind/ppa
+        state: present
+        update_cache: true
+
+    - name: Install MaxMind neccessary Packages
+      apt:
+        pkg:
+          - geoipupdate
+          - libmaxminddb0
+          - libmaxminddb-dev
+          - mmdb-bin
+        state: latest
+        update_cache: true
+      tags: ["max-mind"]
+
+
+    - name: Clone GeoIP2 repository
+      git:
+        repo: "https://github.com/leev/ngx_http_geoip2_module.git"
+        dest: "{{ nginx_install_dir }}/geoip2"
+        clone: yes
+        update: yes
+      register: geoip2_source
+
+
+    # - name: Unpacking Naxsi
+    #   unarchive:
+    #     copy: false
+    #     dest: "{{ nginx_install_dir }}"
+    #     src: "{{ naxsi_source.dest }}"
+    #     owner: devops
+    #   when: naxsi_source.changed
+    #   register: naxsi_source_unpack
+
+    - name: Unpacking NGINX
+      unarchive:
+        copy: false
+        dest: "{{ nginx_install_dir }}"
+        src: "{{ nginx_source.dest }}"
+        creates: "{{ nginx_version }}"
+        owner: "{{ user }}"
+      when: nginx_source.changed
+      register: nginx_source_unpack
+
+    - name: Configuring NGINX source with custom modules
+      become: true
+      shell: ./configure --with-cc-opt='-g -O2 -flto=auto -ffat-lto-objects -flto=auto -ffat-lto-objects -fstack-protector-strong -Wformat -Werror=format-security -fPIC -Wdate-time -D_FORTIFY_SOURCE=2' --with-ld-opt='-Wl,-Bsymbolic-functions -flto=auto -ffat-lto-objects -flto=auto -Wl,-z,relro -Wl,-z,now -fPIC' --prefix=/usr/share/nginx --sbin-path=/usr/sbin/nginx  --conf-path=/etc/nginx/nginx.conf --http-log-path=/var/log/nginx/access.log --error-log-path=/var/log/nginx/error.log --lock-path=/var/lock/nginx.lock --pid-path=/run/nginx.pid --modules-path=/usr/lib/nginx/modules --http-client-body-temp-path=/var/lib/nginx/body --http-fastcgi-temp-path=/var/lib/nginx/fastcgi --http-proxy-temp-path=/var/lib/nginx/proxy --http-scgi-temp-path=/var/lib/nginx/scgi --http-uwsgi-temp-path=/var/lib/nginx/uwsgi --with-compat --with-debug --with-pcre-jit --with-http_ssl_module --with-http_stub_status_module --with-http_realip_module --with-http_auth_request_module --with-http_v2_module --with-http_dav_module --with-http_slice_module --with-threads  --add-dynamic-module=../geoip2 --with-http_addition_module --with-http_gunzip_module --with-http_gzip_static_module --with-http_sub_module --with-stream=dynamic --with-stream_ssl_module --add-dynamic-module=../brotli 
+      # --add-dynamic-module=../naxsi-1.3/naxsi_src
+      args:  
+        chdir: "{{ nginx_install_dir }}/{{ nginx_version }}"
+      register: nginx_configured
+
+    - name: Installing NGINX
+      become: true
+      shell: make -j4 && make install
+      args:
+        chdir: "{{ nginx_install_dir }}/{{ nginx_version }}"
+      when: nginx_configured.changed
+
+
+    # - name: Copy Naxsi Core Rules to Nginx
+    #   become: true
+    #   shell: cp /home/{{ user }}/nginx_compiled/naxsi-1.3/naxsi_config/naxsi_core.rules /etc/nginx/
+    #   when: naxsi_source.changed
+
+
+    - name: Delete Defualt Nginx Modules
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      loop:
+        - { "path": "/etc/nginx/modules-enabled" }
+
+    - name: Recreate Nginx Modules Directory
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: root
+        mode: 0644
+      loop:
+        - { "path": "/etc/nginx/modules-enabled" }
+

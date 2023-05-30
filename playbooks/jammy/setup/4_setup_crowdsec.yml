@@ -7,7 +7,12 @@
       args:
         chdir: /home/devops/
         
-    
+    - name: Add PPA for NGINX Stable with HTTP/2 Repository
+      apt_repository:
+        repo: ppa:ondrej/nginx
+        state: present
+        update_cache: true
+
     - name: Install Crowdsec and Bouncer Dependencies
       ansible.builtin.apt:
         pkg:
@@ -58,6 +63,15 @@
         daemon_reload: true
         state: restarted
         name: crowdsec-firewall-bouncer
+
+    - name: Delete Defualt Nginx Modules
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      loop:
+        - { "path": "/etc/nginx/modules-enabled/10-mod-http-ndk.conf" }
+        - { "path": "/etc/nginx/modules-enabled/50-mod-http-lua.conf" }
+
 
     - name: Restart Nginx service
       ansible.builtin.systemd:

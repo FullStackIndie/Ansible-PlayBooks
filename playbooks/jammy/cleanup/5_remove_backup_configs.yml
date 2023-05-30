@@ -7,6 +7,7 @@
       loop:
         - { path: "/home/devops/nginx_compiled/*.gz" }
         - { path: "/usr/local/nginx/modules/*.so.old" }
+        - { path: "/usr/lib/nginx/modules/*.so.old" }
         - { path: "/opt/frp_0.47.0/*.gz" }
         - { path: "/opt/frp_0.47.0/*.ini" }
         - { path: "/opt/frp_0.47.0/frp_0.47.0_linux_amd64/*.ini.*" }

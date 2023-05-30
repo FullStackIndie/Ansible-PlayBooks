@@ -1,0 +1,76 @@
+- hosts: a2hosting,localhost
+  become: true
+  vars:
+    domains:
+      - blog.fullstackindie.net
+      - critter.fullstackindie.net
+      - identity.fullstackindie.net
+      - gateway.fullstackindie.net
+      - frp.fullstackindie.net
+      - crowdsec.fullstackindie.net
+      - portfolio.fullstackindie.net
+      - admin.fullstackindie.net
+
+  tasks:
+    - name: Install Certbot
+      apt:
+        pkg:
+          - certbot
+          - python3-certbot-nginx
+        state: latest
+        update_cache: true
+
+    - name: Register certbot
+      shell: |
+        certbot -n register --agree-tos --email fortheone.dev@gmail.com
+        touch /etc/letsencrypt/.registered
+      args:
+        creates: /etc/letsencrypt/.registered
+
+    - name: Setup cronjob for renewal
+      cron:
+        name: certbot-renewal
+        job: "/bin/bash -lc '/usr/local/bin/certbot -q renew'"
+        minute: "0"
+        hour: "14"
+
+    - name: "Get certificates for Copied Nginx Configs and Known/Common Websites with Registered Domains"
+      become: true
+      command: "certbot -n --nginx certonly -d {{ item }}"
+      args:
+        creates: "/etc/letsencrypt/live/{{ item }}"
+      ignore_errors: true
+      loop: "{{ domains }}"
+
+    - name: Remove Apache because it also uses port 80
+      apt:
+        pkg:
+          - apache2
+          - apache2-bin
+          - apache2-data
+          - apache2-doc
+        state: absent
+        purge: true
+        update_cache: true
+
+    - name: Make sure Nginx service unit is running
+      ansible.builtin.systemd:
+        daemon_reload: true
+        state: started
+        name: nginx
+
+    - name: Restart Nginx service
+      ansible.builtin.systemd:
+        state: restarted
+        name: nginx
+
+    - name: Apache Utils for Nginx Basic Auth
+      apt:
+        pkg:
+          - apache2-utils
+        state: latest
+        update_cache: true
+
+    - name: Setup FullStackIndie Admin Dashboard Password
+      become: true
+      command: "sudo htpasswd -c /etc/apache2/.htpasswd {{ fullstackindie_admin_dashboard_password }}"

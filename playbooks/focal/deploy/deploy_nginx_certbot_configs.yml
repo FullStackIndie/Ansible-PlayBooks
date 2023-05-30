@@ -13,7 +13,7 @@
 
     - name: Copy Otel Module for Nginx Open Telemetry
       ansible.builtin.copy:
-        src: /home/murph/workspace/nginx/otelcollector/otel_ngx_module.so
+        src: /home/murph/workspace/nginx/otelcollector/ngx_http_opentelemetry_module.so
         dest: /usr/local/nginx/modules
         force: true
         backup: false

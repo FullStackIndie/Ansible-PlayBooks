@@ -62,7 +62,3 @@
         path: /usr/local/bin/docker-compose
         owner: devops
         group: devops
-
-    - name: Restart to enable sudo for Docker - can also logout I think but rebooting by choice
-      become: true
-      shell: sudo reboot
