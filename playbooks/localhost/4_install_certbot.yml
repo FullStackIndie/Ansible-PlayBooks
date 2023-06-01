@@ -1,16 +1,12 @@
 - hosts: a2hosting,localhost
   become: true
   vars:
-    user: murph
+    user: murph 
     domains:
-      - blog.fullstackindie.net
-      - critter.fullstackindie.net
-      - identity.fullstackindie.net
-      - gateway.fullstackindie.net
-      - frp.fullstackindie.net
-      - crowdsec.fullstackindie.net
-      - portfolio.fullstackindie.net
-      - admin.fullstackindie.net
+      - dev.blog.fullstackindie.net
+      - dev.critter.fullstackindie.net
+      - dev.identity.fullstackindie.net
+      - dev.gateway.fullstackindie.net
 
   tasks:
     - name: Install Certbot

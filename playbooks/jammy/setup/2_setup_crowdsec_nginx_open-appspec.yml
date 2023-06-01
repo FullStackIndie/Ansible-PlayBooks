@@ -1,0 +1,155 @@
+- hosts: a2hosting,localhost
+  become: true
+  vars:
+    user: murph
+  tasks:
+    - name: Add Crowdsec Repo's
+      become: true
+      shell: curl -s https://packagecloud.io/install/repositories/crowdsec/crowdsec/script.deb.sh | sudo bash
+      args:
+        chdir: /home/{{ user }}/
+        
+    - name: Add PPA for NGINX Stable with HTTP/2 Repository
+      apt_repository:
+        repo: ppa:ondrej/nginx
+        state: present
+        update_cache: true
+
+    - name: Install Crowdsec (with Nginx 1.24.0) and Bouncer Dependencies
+      ansible.builtin.apt:
+        pkg:
+          - libnginx-mod-http-lua 
+          - crowdsec
+          - lua5.1 
+          - luarocks 
+          - gettext-base 
+          - lua-cjson
+        state: latest
+        update_cache: true
+
+    - name: Install Crowdsec Bouncers
+      ansible.builtin.apt:
+        pkg:
+          - crowdsec-firewall-bouncer-iptables
+          - crowdsec-nginx-bouncer
+        state: latest
+        update_cache: true
+
+    - name: Delete Defualt Nginx Modules
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      loop:
+        - { "path": "/etc/nginx/modules-enabled/10-mod-http-ndk.conf" }
+        - { "path": "/etc/nginx/modules-enabled/50-mod-http-lua.conf" }
+
+
+    - name: Setup and Start Crowdsec Local Metrics Dashboard
+      become: true
+      shell: |
+        if [ "$(docker ps -q -f name=crowdsec-metabase)" ]; then
+          exit 0
+        fi
+        cscli dashboard setup --yes --password "{{ crowdsec_metabase_password }}"
+      register: crowdsec_container_exists
+
+    - name: Update Crowdsec Docker Container to Restart always
+      become: true
+      shell: |
+        docker update --restart=always crowdsec-metabase
+      when: crowdsec_container_exists.changed
+
+    - name: Installing Crowdsec Scenarios via Collections
+      become: true
+      shell: "{{ item }}"
+      with_items:
+        - cscli collections install crowdsecurity/linux
+        - cscli collections install crowdsecurity/linux-lpe
+        - cscli collections install crowdsecurity/sshd
+        - cscli collections install crowdsecurity/whitelist-good-actors
+        - cscli collections install crowdsecurity/base-http-scenarios
+        - cscli collections install crowdsecurity/wordpress
+        - cscli collections install crowdsecurity/endlessh
+        - cscli collections install crowdsecurity/http-cve
+        - cscli collections install crowdsecurity/iptables
+        - cscli collections install crowdsecurity/nginx
+        - cscli collections install openappsec/openappsec
+        - cscli collections install crowdsecurity/pgsql
+
+    - name: Installing Crowdsec Parsers
+      become: true
+      shell: "{{ item }}"
+      with_items:
+        - cscli parsers install crowdsecurity/cri-logs
+        - cscli parsers install crowdsecurity/dateparse-enrich
+#cscli collections install LePresidente/grafana
+
+
+    - name: A Remove ondrej/nginx PPA for NGINX Stable with HTTP/2 Repository
+      apt_repository:
+        repo: ppa:ondrej/nginx
+        state: absent
+        update_cache: true
+
+    - name: Import an official nginx signing key so apt could verify the packages authenticity
+      become: true
+      shell: curl https://nginx.org/keys/nginx_signing.key | gpg --dearmor | sudo tee /usr/share/keyrings/nginx-archive-keyring.gpg >/dev/null
+
+    - name: Verify that the downloaded file contains the proper key
+      become: true
+      shell: gpg --dry-run --quiet --no-keyring --import --import-options import-show /usr/share/keyrings/nginx-archive-keyring.gpg
+
+    - name: Set up the apt repository for stable nginx packages
+      become: true
+      shell: >
+        echo "deb [signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] http://nginx.org/packages/ubuntu `lsb_release -cs` nginx" 
+        | sudo tee /etc/apt/sources.list.d/nginx.list
+
+    # - name: Set up repository pinning to prefer our Nginx packages over distribution-provided ones
+    #   become: true
+    #   shell: >
+    #     echo -e "Package: *\nPin: origin nginx.org\nPin: release o=nginx\nPin-Priority: 900\n" | sudo tee /etc/apt/preferences.d/99nginx
+
+    - name: Install Nginx 
+      apt:
+        pkg:
+          - nginx
+        state: latest
+        update_cache: true
+      tags: ["setup"]
+
+
+
+    - name: Download open-appspec
+      become: true
+      shell: |
+        wget https://downloads.openappsec.io/open-appsec-install && chmod +x open-appsec-install
+      args:
+        chdir: '/home/{{ user }}'
+
+
+    - name: Install open-appspec
+      become: true
+      shell: |
+        ./open-appsec-install --auto
+      args:
+        chdir: '/home/{{ user }}'
+
+
+    - name: Restart Nginx service
+      become: true
+      ansible.builtin.systemd:
+        state: reloaded
+        name: crowdsec
+
+    - name: Restart Crowdsec service
+      ansible.builtin.systemd:
+        daemon_reload: true
+        state: restarted
+        name: crowdsec
+        
+    - name: Restart Crowsec Firewall Bouncer
+      ansible.builtin.systemd:
+        daemon_reload: true
+        state: restarted
+        name: crowdsec-firewall-bouncer

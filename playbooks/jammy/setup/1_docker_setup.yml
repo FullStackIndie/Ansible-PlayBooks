@@ -1,5 +1,8 @@
 - hosts: a2hosting,localhost
   become: true
+  vars:
+    user: murph
+
   tasks:
     - name: Install Required Packages for Docker
       apt:
@@ -50,6 +53,14 @@
         name: devops
         groups: docker
         append: yes
+
+
+    - name: Adding user "devops" to Docker Group
+      become: true
+      shell: >
+        sudo usermod -aG docker {{ user }}
+        su - {{ user }}
+   
 
     - name: Install docker-compose
       get_url:

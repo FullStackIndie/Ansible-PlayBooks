@@ -20,3 +20,9 @@
         backup: true
         owner: root
         mode: 0440
+
+        
+    - name: Restart SSH
+      become: true
+      command: 'systemctl restart ssh'
+
