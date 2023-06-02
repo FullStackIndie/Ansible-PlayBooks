@@ -1,0 +1,22 @@
+- hosts: a2hosting,localhost
+  become: true
+  vars:
+    user: murph
+  tasks:
+    - name: Download open-appspec
+      become: true
+      shell: |
+        if [ -e "/home/murph/open-appsec-install" ]; then
+            exit 0
+        else
+            wget https://downloads.openappsec.io/open-appsec-install && chmod +x open-appsec-install
+        fi
+      args:
+        chdir: '/home/{{ user }}'
+
+    - name: Install open-appspec
+      become: true
+      shell: |
+        ./open-appsec-install --auto --email {{ open_appsec_email }}
+      args:
+        chdir: '/home/{{ user }}'

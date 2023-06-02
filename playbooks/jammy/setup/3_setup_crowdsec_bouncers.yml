@@ -1,0 +1,112 @@
+- hosts: a2hosting,localhost
+  become: true
+  vars:
+    user: murph
+  tasks:
+    - name: Delete Official Nginx apt list
+      ansible.builtin.file:
+        path: /etc/apt/sources.list.d/nginx.list
+        state: absent
+
+    - name: Delete Official Nginx apt preference
+      ansible.builtin.file:
+        path: /etc/apt/preferences.d/99nginx
+        state: absent
+        
+    - name: A Remove ondrej/nginx PPA for NGINX Stable with HTTP/2 Repository
+      apt_repository:
+        repo: ppa:ondrej/nginx
+        state: absent
+        update_cache: true
+
+    - name: Uninstall Crowdsec and Bouncers for clean install
+      ansible.builtin.apt:
+        pkg:
+          - crowdsec-firewall-bouncer-iptables
+          - crowdsec-firewall-bouncer-nftables
+          - crowdsec-nginx-bouncer
+          - crowdsec
+        state: absent
+        update_cache: true
+
+    - name: Add Crowdsec Repo's
+      become: true
+      shell: curl -s https://packagecloud.io/install/repositories/crowdsec/crowdsec/script.deb.sh | sudo bash
+      args:
+        chdir: /home/{{ user }}/
+        
+    - name: Install Crowdsec
+      ansible.builtin.apt:
+        pkg:
+          - crowdsec
+        state: latest
+        update_cache: true
+
+    - name: Install Crowdsec Firewall Bouncer
+      ansible.builtin.apt:
+        pkg:
+          - crowdsec-firewall-bouncer-nftables
+        state: latest
+        update_cache: true
+
+    - name: Delete Defualt Nginx Modules
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      loop:
+        - { "path": "/etc/nginx/modules-enabled/10-mod-http-ndk.conf" }
+        - { "path": "/etc/nginx/modules-enabled/50-mod-http-lua.conf" }
+
+
+    - name: Setup and Start Crowdsec Local Metrics Dashboard
+      become: true
+      shell: |
+        if [ "$(docker ps -q -f name=crowdsec-metabase)" ]; then
+          exit 0
+        fi
+        cscli dashboard setup --yes --password "{{ crowdsec_metabase_password }}"
+      register: crowdsec_container_exists
+
+    - name: Update Crowdsec Docker Container to Restart always
+      become: true
+      shell: |
+        docker update --restart=always crowdsec-metabase
+      when: crowdsec_container_exists.changed
+
+    - name: Installing Crowdsec Scenarios via Collections
+      become: true
+      shell: "{{ item }}"
+      with_items:
+        - cscli collections install crowdsecurity/linux
+        - cscli collections install crowdsecurity/linux-lpe
+        - cscli collections install crowdsecurity/sshd
+        - cscli collections install crowdsecurity/whitelist-good-actors
+        - cscli collections install crowdsecurity/base-http-scenarios
+        - cscli collections install crowdsecurity/wordpress
+        - cscli collections install crowdsecurity/endlessh
+        - cscli collections install crowdsecurity/http-cve
+        - cscli collections install crowdsecurity/iptables
+        - cscli collections install crowdsecurity/nginx
+        - cscli collections install openappsec/openappsec
+        - cscli collections install crowdsecurity/pgsql
+
+    - name: Installing Crowdsec Parsers
+      become: true
+      shell: "{{ item }}"
+      with_items:
+        - cscli parsers install crowdsecurity/cri-logs
+        - cscli parsers install crowdsecurity/dateparse-enrich
+#cscli collections install LePresidente/grafana
+
+
+    - name: Restart Crowdsec service
+      ansible.builtin.systemd:
+        daemon_reload: true
+        state: restarted
+        name: crowdsec
+        
+    - name: Restart Crowsec Firewall Bouncer
+      ansible.builtin.systemd:
+        daemon_reload: true
+        state: restarted
+        name: crowdsec-firewall-bouncer

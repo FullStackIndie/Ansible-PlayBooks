@@ -1,1 +1,1 @@
-libnginx-mod-http-lua crowdsec lua5.1 luarocks gettext-base lua-cjson
+docker cp $(docker create --name tc nginx_ubuntu:latest):/otel-webserver-module/build/opentelemetry-webserver-sdk-x64-linux.tgz ~/nginx-otel-1.24.0 && docker rm tc

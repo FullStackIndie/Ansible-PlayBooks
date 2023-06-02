@@ -1,19 +1,38 @@
 - hosts: a2hosting,localhost
   become: true
   vars:
-    nginx_version: nginx-1.24.0 # Required version to use Nginx OpenTelemetry Contrib
+    nginx_version: nginx-1.22.0 # Required version to use Nginx OpenTelemetry Contrib
     nginx_tarball_url: "http://nginx.org/download/{{ nginx_version }}.tar.gz"
     nginx_install_dir: "/home/{{ user }}/nginx_compiled"
     nginx_sbin_path: "/usr/sbin/nginx"
     nginx_conf_path: "/etc/nginx/nginx.conf"
     nginx_prefix: "/usr/local/nginx"
-    # ndk: ndk
-    # ngx_lua: ngx_lua
     user: murph
 
   tasks:
-  
-    - name: Install Required Packages for Nginx Download
+    - name: Remove ondrej/nginx PPA for NGINX Stable with HTTP/2 Repository
+      apt_repository:
+        repo: ppa:ondrej/nginx
+        state: absent
+        update_cache: true
+
+    - name: Uninstall Nginx and Crowdsec for clean install
+      ansible.builtin.apt:
+        pkg:
+          - crowdsec-firewall-bouncer-iptables
+          - crowdsec-firewall-bouncer-nftables
+          - crowdsec-nginx-bouncer
+          - crowdsec
+          - crowdsec
+          - nginx
+          - nginx-full
+          - nginx-common
+          - nginx-extras
+        state: absent
+        update_cache: true
+
+
+    - name: Install Required Packages for Official Nginx Download
       apt:
         pkg:
           - curl 
@@ -25,26 +44,43 @@
         update_cache: true
       tags: ["setup"]
 
-    # - name: Import an official nginx signing key so apt could verify the packages authenticity
-    #   become: true
-    #   shell: curl https://nginx.org/keys/nginx_signing.key | gpg --dearmor | sudo tee /usr/share/keyrings/nginx-archive-keyring.gpg >/dev/null
 
-    # - name: Verify that the downloaded file contains the proper key
-    #   become: true
-    #   shell: gpg --dry-run --quiet --no-keyring --import --import-options import-show /usr/share/keyrings/nginx-archive-keyring.gpg
+    - name: Import an official nginx signing key so apt could verify the packages authenticity
+      become: true
+      shell: curl https://nginx.org/keys/nginx_signing.key | gpg --dearmor | sudo tee /usr/share/keyrings/nginx-archive-keyring.gpg >/dev/null
 
-    # - name: Set up the apt repository for stable nginx packages
-    #   become: true
-    #   shell: >
-    #     echo "deb [signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] http://nginx.org/packages/ubuntu `lsb_release -cs` nginx" 
-    #     | sudo tee /etc/apt/sources.list.d/nginx.list
+    - name: Verify that the downloaded file contains the proper key
+      become: true
+      shell: gpg --dry-run --quiet --no-keyring --import --import-options import-show /usr/share/keyrings/nginx-archive-keyring.gpg
 
-    # - name: Set up repository pinning to prefer our Nginx packages over distribution-provided ones
-    #   become: true
-    #   shell: >
-    #     echo -e "Package: *\nPin: origin nginx.org\nPin: release o=nginx\nPin-Priority: 900\n" | sudo tee /etc/apt/preferences.d/99nginx
+    - name: Set up the apt repository for stable nginx packages
+      become: true
+      shell: >
+        echo "deb [signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] http://nginx.org/packages/ubuntu `lsb_release -cs` nginx" 
+        | sudo tee /etc/apt/sources.list.d/nginx.list
 
-    - name: Install Required Packages for Nginx and OpenSSL
+    - name: Copy Official Nginx Package Preferences 
+      ansible.builtin.copy:
+        src: /home/{{ user }}/workspace/nginx/99nginx
+        dest: /etc/apt/preferences.d/99nginx
+        force: true
+        backup: false
+        owner: root
+        mode: 0644
+
+    - name: Update Package Cache
+      apt:
+        update_cache: true
+      tags: ["setup"]
+
+    - name: Install Nginx 
+      apt:
+        name: nginx=1.22.0-1~jammy
+        state: present
+        update_cache: true
+      tags: ["setup"]
+
+    - name: Install Required Packages to Compile Nginx with OpenSSL, PCRE, and Zlib
       apt:
         pkg:
           - build-essential
@@ -53,14 +89,6 @@
           - zlib1g 
           - zlib1g-dev 
           - libssl-dev
-        state: latest
-        update_cache: true
-      tags: ["setup"]
-
-    - name: Install Nginx 
-      apt:
-        pkg:
-          - nginx
         state: latest
         update_cache: true
       tags: ["setup"]
@@ -76,23 +104,11 @@
         - { "path": "{{ nginx_install_dir }}/geoip2" }
         - { "path": "{{ nginx_install_dir }}/brotli" }
 
-    - name: Downloading NGINX source
+    - name: Downloading NGINX {{ nginx_version }} source
       get_url:
         url: "{{ nginx_tarball_url }}"
         dest: "{{ nginx_install_dir }}/{{ nginx_version }}.tar.gz"
       register: nginx_source
-
-    # - name: Downloading NGINX NDK
-    #   get_url:
-    #     url: "https://github.com/vision5/ngx_devel_kit/archive/refs/tags/v0.3.2.tar.gz"
-    #     dest: "{{ nginx_install_dir }}/{{ ndk }}.tar.gz"
-    #   register: ndk_source
-
-    # - name: Downloading NGINX Lua Module
-    #   get_url:
-    #     url: "https://github.com/openresty/lua-nginx-module/archive/refs/tags/v0.10.24.tar.gz"
-    #     dest: "{{ nginx_install_dir }}/{{ ngx_lua }}.tar.gz"
-    #   register: ngx_lua_source
 
     - name: Clone Brotli source
       git:
@@ -139,37 +155,18 @@
       when: nginx_source.changed
       register: nginx_source_unpack
 
-    # - name: Unpacking NGINX NDK
-    #   unarchive:
-    #     copy: false
-    #     dest: "{{ nginx_install_dir }}"
-    #     src: "{{ ndk_source.dest }}"
-    #     owner: "{{ user }}"
-    #   when: ndk_source.changed
-    #   register: ndk_source_unpack
-
-    # - name: Unpacking NGINX Lua Module
-    #   unarchive:
-    #     copy: false
-    #     dest: "{{ nginx_install_dir }}"
-    #     src: "{{ ngx_lua_source.dest }}"
-    #     owner: "{{ user }}"
-    #   environment:
-    #     LUAJIT_LIB: /usr/local/lib
-    #     LUAJIT_INC: /usr/local/include/luajit-2.1
-    #   when: ngx_lua_source.changed
-    #   register: ngx_lua_source_unpack
+    - name: Delete Existing Nginx Modules
+      ansible.builtin.file:
+        path: /usr/lib/nginx/modules
+        state: absent
 
     - name: Configuring NGINX source with custom modules
       become: true
-      # environment:
-      #   LUAJIT_LIB: /usr/local/lib
-      #   LUAJIT_INC: /usr/local/include/luajit-2.1
-      # shell: ./configure --with-cc-opt='-g -O2 -flto=auto -ffat-lto-objects -flto=auto -ffat-lto-objects -fstack-protector-strong -Wformat -Werror=format-security -fPIC -Wdate-time -D_FORTIFY_SOURCE=2' --with-ld-opt='-Wl,-rpath,/usr/local/lib,-Bsymbolic-functions -flto=auto -ffat-lto-objects -flto=auto -Wl,-z,relro -Wl,-z,now -fPIC' --prefix=/usr/share/nginx --sbin-path=/usr/sbin/nginx  --conf-path=/etc/nginx/nginx.conf --http-log-path=/var/log/nginx/access.log --error-log-path=/var/log/nginx/error.log --lock-path=/var/lock/nginx.lock --pid-path=/run/nginx.pid --modules-path=/usr/lib/nginx/modules --http-client-body-temp-path=/var/lib/nginx/body --http-fastcgi-temp-path=/var/lib/nginx/fastcgi --http-proxy-temp-path=/var/lib/nginx/proxy --http-scgi-temp-path=/var/lib/nginx/scgi --http-uwsgi-temp-path=/var/lib/nginx/uwsgi --with-compat --with-debug --with-pcre-jit --with-http_ssl_module --with-http_stub_status_module --with-http_realip_module --with-http_auth_request_module --with-http_v2_module --with-http_dav_module --with-http_slice_module --with-threads  --add-dynamic-module=../geoip2 --with-http_addition_module --with-http_gunzip_module --with-http_gzip_static_module --with-http_sub_module --with-stream=dynamic --with-stream_ssl_module --add-dynamic-module=../brotli --add-dynamic-module=../lua-nginx-module-0.10.24 --add-dynamic-module=../ngx_devel_kit-0.3.2
       shell: ./configure --with-cc-opt='-g -O2 -flto=auto -ffat-lto-objects -flto=auto -ffat-lto-objects -fstack-protector-strong -Wformat -Werror=format-security -fPIC -Wdate-time -D_FORTIFY_SOURCE=2' --with-ld-opt='-Wl,-Bsymbolic-functions -flto=auto -ffat-lto-objects -flto=auto -Wl,-z,relro -Wl,-z,now -fPIC' --prefix=/usr/share/nginx --sbin-path=/usr/sbin/nginx  --conf-path=/etc/nginx/nginx.conf --http-log-path=/var/log/nginx/access.log --error-log-path=/var/log/nginx/error.log --lock-path=/var/lock/nginx.lock --pid-path=/run/nginx.pid --modules-path=/usr/lib/nginx/modules --http-client-body-temp-path=/var/lib/nginx/body --http-fastcgi-temp-path=/var/lib/nginx/fastcgi --http-proxy-temp-path=/var/lib/nginx/proxy --http-scgi-temp-path=/var/lib/nginx/scgi --http-uwsgi-temp-path=/var/lib/nginx/uwsgi --with-compat --with-debug --with-pcre-jit --with-http_ssl_module --with-http_stub_status_module --with-http_realip_module --with-http_auth_request_module --with-http_v2_module --with-http_dav_module --with-http_slice_module --with-threads  --add-dynamic-module=../geoip2 --with-http_addition_module --with-http_gunzip_module --with-http_gzip_static_module --with-http_sub_module --with-stream=dynamic --with-stream_ssl_module --add-dynamic-module=../brotli 
       args:  
         chdir: "{{ nginx_install_dir }}/{{ nginx_version }}"
       register: nginx_configured
+
 
     - name: Installing NGINX
       become: true

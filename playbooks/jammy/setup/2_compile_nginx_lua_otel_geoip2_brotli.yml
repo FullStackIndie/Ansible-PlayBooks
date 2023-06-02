@@ -1,0 +1,318 @@
+- hosts: a2hosting,localhost
+  become: true
+  vars:
+    nginx_version: nginx-1.23.1 # Required version to use Nginx OpenTelemetry Contrib
+    nginx_tarball_url: "http://nginx.org/download/{{ nginx_version }}.tar.gz"
+    nginx_install_dir: "/home/{{ user }}/nginx_compiled"
+    nginx_sbin_path: "/usr/sbin/nginx"
+    nginx_conf_path: "/etc/nginx/nginx.conf"
+    nginx_prefix: "/usr/local/nginx"
+    ndk: ndk
+    ngx_lua: ngx_lua
+    user: murph
+
+  tasks:
+    - name: Remove ondrej/nginx PPA for NGINX Stable with HTTP/2 Repository
+      apt_repository:
+        repo: ppa:ondrej/nginx
+        state: absent
+        update_cache: true
+
+    - name: Uninstall Nginx and Crowdsec for clean install
+      ansible.builtin.apt:
+        pkg:
+          - crowdsec-firewall-bouncer-iptables
+          - crowdsec-firewall-bouncer-nftables
+          - crowdsec-nginx-bouncer
+          - crowdsec
+          - crowdsec
+          - nginx
+          - nginx-full
+          - nginx-common
+          - nginx-extras
+        state: absent
+        update_cache: true
+
+    - name: Install Required Packages for Nginx Download
+      apt:
+        pkg:
+          - curl 
+          - gnupg2 
+          - ca-certificates 
+          - lsb-release 
+          - ubuntu-keyring
+        state: latest
+        update_cache: true
+      tags: ["setup"]
+
+    - name: Install Required Packages for Nginx and OpenSSL
+      apt:
+        pkg:
+          - build-essential
+          - libpcre3 
+          - libpcre3-dev 
+          - zlib1g 
+          - zlib1g-dev 
+          - libssl-dev
+        state: latest
+        update_cache: true
+      tags: ["setup"]
+
+    - name: Import an official nginx signing key so apt could verify the packages authenticity
+      become: true
+      shell: curl https://nginx.org/keys/nginx_signing.key | gpg --dearmor | sudo tee /usr/share/keyrings/nginx-archive-keyring.gpg >/dev/null
+
+    - name: Verify that the downloaded file contains the proper key
+      become: true
+      shell: gpg --dry-run --quiet --no-keyring --import --import-options import-show /usr/share/keyrings/nginx-archive-keyring.gpg
+
+    - name: Set up the apt repository for stable nginx packages
+      become: true
+      shell: >
+        echo "deb [signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] http://nginx.org/packages/ubuntu `lsb_release -cs` nginx" 
+        | sudo tee /etc/apt/sources.list.d/nginx.list
+
+    - name: Copy Official Nginx Package Preferences 
+      ansible.builtin.copy:
+        src: /home/{{ user }}/workspace/nginx/99nginx
+        dest: /etc/apt/preferences.d/99nginx
+        force: true
+        backup: false
+        owner: root
+        mode: 0644
+
+    - name: Update Apt Cache 
+      apt:
+        update_cache: true
+        autoremove: true
+      tags: ["setup"]
+
+    - name: Install Nginx 
+      apt:
+        pkg:
+          - nginx=1.23.1
+        state: present
+        update_cache: true
+      tags: ["setup"]
+
+    - name: Create required Nginx dirs to Compile needed Modules
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: "{{ user }}"
+        mode: 0755
+      loop:
+        - { "path": "{{ nginx_install_dir }}" }
+        - { "path": "{{ nginx_install_dir }}/geoip2" }
+        - { "path": "{{ nginx_install_dir }}/brotli" }
+
+    - name: Downloading NGINX source
+      get_url:
+        url: "{{ nginx_tarball_url }}"
+        dest: "{{ nginx_install_dir }}/{{ nginx_version }}.tar.gz"
+      register: nginx_source
+
+    - name: Downloading LuaJIT2 source
+      get_url:
+        url: "https://github.com/openresty/luajit2/archive/refs/tags/v2.1-20230410.tar.gz"
+        dest: "{{ nginx_install_dir }}/lua-jit.tar.gz"
+      register: luajit_source
+
+    - name: Downloading NGINX NDK
+      get_url:
+        url: "https://github.com/vision5/ngx_devel_kit/archive/refs/tags/v0.3.2.tar.gz"
+        dest: "{{ nginx_install_dir }}/{{ ndk }}.tar.gz"
+      register: ndk_source
+
+    - name: Downloading NGINX Lua Module
+      get_url:
+        url: "https://github.com/openresty/lua-nginx-module/archive/refs/tags/v0.10.24.tar.gz"
+        dest: "{{ nginx_install_dir }}/{{ ngx_lua }}.tar.gz"
+      register: ngx_lua_source
+
+    - name: Downloading Open Resty Lua Core
+      get_url:
+        url: "https://github.com/openresty/lua-resty-core/archive/refs/tags/v0.1.26.tar.gz"
+        dest: "{{ nginx_install_dir }}/ngx_resty_lua_core.tar.gz"
+      register: ngx_resty_lua_core_source
+
+    - name: Downloading Open Resty Lua LRU Cache
+      get_url:
+        url: "https://github.com/openresty/lua-resty-lrucache/archive/refs/tags/v0.13.tar.gz"
+        dest: "{{ nginx_install_dir }}/ngx_resty_lua_lrucache.tar.gz"
+      register: ngx_resty_lua_lrucache_source
+
+    - name: Clone Brotli source
+      git:
+        repo: "https://github.com/google/ngx_brotli.git"
+        dest: "{{ nginx_install_dir }}/brotli"
+        clone: yes
+        update: yes
+      register: brotli_source
+
+    - name: Add MaxMind Repository
+      apt_repository:
+        repo: ppa:maxmind/ppa
+        state: present
+        update_cache: true
+
+    - name: Install MaxMind neccessary Packages
+      apt:
+        pkg:
+          - geoipupdate
+          - libmaxminddb0
+          - libmaxminddb-dev
+          - mmdb-bin
+        state: latest
+        update_cache: true
+      tags: ["max-mind"]
+
+
+    - name: Clone GeoIP2 repository
+      git:
+        repo: "https://github.com/leev/ngx_http_geoip2_module.git"
+        dest: "{{ nginx_install_dir }}/geoip2"
+        clone: yes
+        update: yes
+      register: geoip2_source
+
+
+    - name: Unpacking NGINX
+      unarchive:
+        copy: false
+        dest: "{{ nginx_install_dir }}"
+        src: "{{ nginx_source.dest }}"
+        creates: "{{ nginx_version }}"
+        owner: "{{ user }}"
+      when: nginx_source.changed
+      register: nginx_source_unpack
+
+
+    - name: Unpacking LUA JIT 2 
+      unarchive:
+        copy: false
+        dest: "{{ nginx_install_dir }}"
+        src: "{{ luajit_source.dest }}"
+        owner: "{{ user }}"
+      when: luajit_source.changed
+      register: luajit_source_unpack
+
+    - name: Unpacking NGINX NDK
+      unarchive:
+        copy: false
+        dest: "{{ nginx_install_dir }}"
+        src: "{{ ndk_source.dest }}"
+        owner: "{{ user }}"
+      when: ndk_source.changed
+      register: ndk_source_unpack
+
+    - name: Unpacking NGINX Lua Module
+      unarchive:
+        copy: false
+        dest: "{{ nginx_install_dir }}"
+        src: "{{ ngx_lua_source.dest }}"
+        owner: "{{ user }}"
+      when: ngx_lua_source.changed
+      register: ngx_lua_source_unpack
+
+    - name: Unpacking Open Resty Lua Core
+      unarchive:
+        copy: false
+        dest: "{{ nginx_install_dir }}"
+        src: "{{ ngx_resty_lua_core_source.dest }}"
+        owner: "{{ user }}"
+      when: ngx_resty_lua_core_source.changed
+      register: ngx_resty_lua_core_source_unpack
+
+    - name: Unpacking Open Resty Lua LRU Cache
+      unarchive:
+        copy: false
+        dest: "{{ nginx_install_dir }}"
+        src: "{{ ngx_resty_lua_lrucache_source.dest }}"
+        owner: "{{ user }}"
+      when: ngx_resty_lua_lrucache_source.changed
+      register: ngx_resty_lua_lrucache_source_unpack
+
+
+    - name: Installing LUA JIT 2
+      become: true
+      shell: make -j4 && make install
+      when: luajit_source_unpack.changed
+      environment:
+        LUAJIT_LIB: /usr/local/lib
+        LUAJIT_INC: /usr/local/include/luajit-2.1
+      args:
+        chdir: "{{ nginx_install_dir }}/luajit2-2.1-20230410"
+
+    - name: Delete Existing Nginx Modules
+      ansible.builtin.file:
+        path: /usr/lib/nginx/modules
+        state: absent
+
+    - name: Create Nginx Module Directory
+      ansible.builtin.file:
+        path: /usr/lib/nginx/modules
+        state: absent
+
+    - name: Configuring NGINX source with custom modules
+      become: true
+      environment:
+        LUAJIT_LIB: /usr/local/lib
+        LUAJIT_INC: /usr/local/include/luajit-2.1
+      shell: ./configure --with-cc-opt='-g -O2 -flto=auto -ffat-lto-objects -flto=auto -ffat-lto-objects -fstack-protector-strong -Wformat -Werror=format-security -fPIC -Wdate-time -D_FORTIFY_SOURCE=2' --with-ld-opt='-Wl,-rpath,/usr/local/lib,-Bsymbolic-functions -flto=auto -ffat-lto-objects -flto=auto -Wl,-z,relro -Wl,-z,now -fPIC' --prefix=/usr/share/nginx --sbin-path=/usr/sbin/nginx  --conf-path=/etc/nginx/nginx.conf --http-log-path=/var/log/nginx/access.log --error-log-path=/var/log/nginx/error.log --lock-path=/var/lock/nginx.lock --pid-path=/run/nginx.pid --modules-path=/usr/lib/nginx/modules --http-client-body-temp-path=/var/lib/nginx/body --http-fastcgi-temp-path=/var/lib/nginx/fastcgi --http-proxy-temp-path=/var/lib/nginx/proxy --http-scgi-temp-path=/var/lib/nginx/scgi --http-uwsgi-temp-path=/var/lib/nginx/uwsgi --with-compat --with-debug --with-pcre-jit --with-http_ssl_module --with-http_stub_status_module --with-http_realip_module --with-http_auth_request_module --with-http_v2_module --with-http_dav_module --with-http_slice_module --with-threads  --add-dynamic-module=../geoip2 --with-http_addition_module --with-http_gunzip_module --with-http_gzip_static_module --with-http_sub_module --with-stream=dynamic --with-stream_ssl_module --add-dynamic-module=../brotli --add-dynamic-module=../lua-nginx-module-0.10.24 --add-dynamic-module=../ngx_devel_kit-0.3.2
+      # shell: ./configure --with-cc-opt='-g -O2 -flto=auto -ffat-lto-objects -flto=auto -ffat-lto-objects -fstack-protector-strong -Wformat -Werror=format-security -fPIC -Wdate-time -D_FORTIFY_SOURCE=2' --with-ld-opt='-Wl,-Bsymbolic-functions -flto=auto -ffat-lto-objects -flto=auto -Wl,-z,relro -Wl,-z,now -fPIC' --prefix=/usr/share/nginx --sbin-path=/usr/sbin/nginx  --conf-path=/etc/nginx/nginx.conf --http-log-path=/var/log/nginx/access.log --error-log-path=/var/log/nginx/error.log --lock-path=/var/lock/nginx.lock --pid-path=/run/nginx.pid --modules-path=/usr/lib/nginx/modules --http-client-body-temp-path=/var/lib/nginx/body --http-fastcgi-temp-path=/var/lib/nginx/fastcgi --http-proxy-temp-path=/var/lib/nginx/proxy --http-scgi-temp-path=/var/lib/nginx/scgi --http-uwsgi-temp-path=/var/lib/nginx/uwsgi --with-compat --with-debug --with-pcre-jit --with-http_ssl_module --with-http_stub_status_module --with-http_realip_module --with-http_auth_request_module --with-http_v2_module --with-http_dav_module --with-http_slice_module --with-threads  --add-dynamic-module=../geoip2 --with-http_addition_module --with-http_gunzip_module --with-http_gzip_static_module --with-http_sub_module --with-stream=dynamic --with-stream_ssl_module --add-dynamic-module=../brotli 
+      args:  
+        chdir: "{{ nginx_install_dir }}/{{ nginx_version }}"
+      register: nginx_configured
+
+
+    - name: Installing Open Resty LUA Core
+      become: true
+      shell: make -j4 && make install PREFIX=/usr/local/lua
+      when: ngx_resty_lua_core_source_unpack.changed
+      environment:
+        LUAJIT_LIB: /usr/local/lib
+        LUAJIT_INC: /usr/local/include/luajit-2.1
+      args:
+        chdir: "{{ nginx_install_dir }}/lua-resty-core-0.1.26"
+
+
+    - name: Installing Open Resty LUA LRU Cache
+      become: true
+      shell: make -j4 && make install PREFIX=/usr/local/lua
+      when: ngx_resty_lua_lrucache_source_unpack.changed
+      environment:
+        LUAJIT_LIB: /usr/local/lib
+        LUAJIT_INC: /usr/local/include/luajit-2.1
+      args:
+        chdir: "{{ nginx_install_dir }}/lua-resty-lrucache-0.13"
+
+    - name: Re-Installing NGINX with Configure/Compile options
+      become: true
+      shell: make -j4 && make install
+      args:
+        chdir: "{{ nginx_install_dir }}/{{ nginx_version }}"
+      when: nginx_configured.changed
+
+    - name: Removing Default Modules Conf's From NGINX
+      become: true
+      find:
+        paths: /etc/nginx/modules-enabled
+        patterns:
+          - "50*"
+          - "70*"
+          - "10*"
+      register: module_confs
+
+
+    - name: Delete Default Nginx Modules Confs
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      with_items: "{{ module_confs.files }}"
+
+    - name: Restart Nginx service
+      become: true
+      ansible.builtin.systemd:
+        state: reloaded
+        name: nginx
