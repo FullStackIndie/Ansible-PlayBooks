@@ -7,3 +7,8 @@ docker_password: "{{ vault_docker_password }}"
 crowdsec_metabase_password: "{{ vault_crowdsec_metabase_password }}"
 fullstackindie_admin_dashboard_password: "{{ vault_fullstackindie_admin_dashboard_password }}"
 open_appsec_email: "{{ vault_open_appsec_email }}"
+fullstackindie_email: "{{ vault_fullstackindie_email }}"
+aws_access_key_id: "{{ vault_aws_access_key_id }}"
+aws_secret_access_key: "{{ vault_aws_secret_access_key }}"
+aws_region: "{{ vault_aws_region }}"
+

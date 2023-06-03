@@ -7,14 +7,61 @@
         state: latest
         update_cache: true
 
-    - name: Install Firewall and Workflow tools
+    - name: Install UFW Firewall
+      apt:
+        pkg:
+          - ufw
+        state: latest
+        update_cache: true
+      tags: ["setup"]
+
+    - name: Install curl, wget, jq, nano
       apt:
         pkg:
           - curl
           - nano
-          - ufw
           - jq
-          - bash-completion
+          - wget
         state: latest
         update_cache: true
       tags: ["setup"]
+
+    - name: Install git, bash-completion
+      apt:
+        pkg:
+          - bash-completion
+          - git
+        state: latest
+        update_cache: true
+      tags: ["setup"]
+
+    - name: Install aws cli v2 Dependencies
+      apt:
+        pkg:
+          - unzip
+          - less
+        state: latest
+        update_cache: true
+      tags: ["setup"]
+
+    - name: Install AWS CLI v2
+      become: true
+      shell: |
+        curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+        unzip awscliv2.zip
+        ./aws/install
+      args:
+        chdir: ~/
+
+
+    - name: Setup AWS Credentials for CLI Profile
+      become: true
+      shell: aws configure set {{ item.key }} {{ item.value }} --profile home-server
+      # no_log: true
+      with_dict:
+        aws_access_key_id: "{{ aws_access_key_id }}"
+        aws_secret_access_key: "{{ aws_secret_access_key }}"
+        region: "{{ aws_region }}"
+        output: "json"
+      args:
+        chdir: "~/"
