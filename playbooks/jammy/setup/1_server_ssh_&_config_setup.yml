@@ -12,14 +12,14 @@
         mode: 0644
 
 
-    - name: Copy Sudoers config
-      ansible.builtin.copy:
-        src: /home/murph/workspace/configs/server_setup_configs/sudoers
-        dest: /etc/sudoers
-        force: true
-        backup: true
-        owner: root
-        mode: 0440
+    # - name: Copy Sudoers config
+    #   ansible.builtin.copy:
+    #     src: /home/murph/workspace/configs/server_setup_configs/sudoers
+    #     dest: /etc/sudoers
+    #     force: true
+    #     backup: true
+    #     owner: root
+    #     mode: 0440
 
         
     - name: Restart SSH

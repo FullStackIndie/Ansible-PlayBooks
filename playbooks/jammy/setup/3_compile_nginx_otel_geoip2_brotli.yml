@@ -191,3 +191,14 @@
         path: "{{ item.path }}"
         state: absent
       with_items: "{{ module_confs.files }}"
+
+    - name: Create required Nginx dirs
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: "{{ user }}"
+        mode: 0755
+      loop:
+        - { "path": "/var/lib/nginx" }
+        - { "path": "/var/lib/nginx/body" }
+        - { "path": "/var/lib/nginx/fastcgi" }
