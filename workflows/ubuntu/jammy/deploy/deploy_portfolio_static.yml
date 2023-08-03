@@ -1,0 +1,55 @@
+- name: Run multiple playbooks
+  hosts: a2hosting
+
+- name: Deploy TacoCat
+  import_playbook: ../../../../playbooks/jammy/deploy/static_sites/js_challenges.yml
+  vars: 
+    site_name: TacoCat
+    tmp_path: /tmp/TacoCat
+    git_url: https://{{ github_pat_ansible_deploy }}@github.com/FullStackIndie/{{site_name}}.git
+    nginx_conf_path: /home/murph/workspace/nginx/conf.d/portfolio/challenges/javascript_challenges.conf
+
+- name: Deploy FizzBuzz
+  import_playbook: ../../../../playbooks/jammy/deploy/static_sites/js_challenges.yml
+  vars: 
+    site_name: FizzBuzz
+    tmp_path: /tmp/{{site_name}}
+    git_url: https://{{ github_pat_ansible_deploy }}@github.com/FullStackIndie/{{site_name}}.git
+    nginx_conf_path: /home/murph/workspace/nginx/conf.d/portfolio/challenges/javascript_challenges.conf
+
+
+- name: Deploy MortgageCalculator
+  import_playbook: ../../../../playbooks/jammy/deploy/static_sites/js_challenges.yml
+  vars: 
+    site_name: MortgageCalculator
+    tmp_path: /tmp/{{site_name}}
+    git_url: https://{{ github_pat_ansible_deploy }}@github.com/FullStackIndie/{{site_name}}.git
+    nginx_conf_path: /home/murph/workspace/nginx/conf.d/portfolio/challenges/javascript_challenges.conf
+
+
+- name: Deploy SumOfAllFears
+  import_playbook: ../../../../playbooks/jammy/deploy/static_sites/js_challenges.yml
+  vars: 
+    site_name: SumOfAllFears
+    tmp_path: /tmp/{{site_name}}
+    git_url: https://{{ github_pat_ansible_deploy }}@github.com/FullStackIndie/{{site_name}}.git
+    nginx_conf_path: /home/murph/workspace/nginx/conf.d/portfolio/challenges/javascript_challenges.conf
+
+
+- name: Deploy SuperDogEvents
+  import_playbook: ../../../../playbooks/jammy/deploy/static_sites/js_challenges.yml
+  vars: 
+    site_name: SuperDogEvents
+    tmp_path: /tmp/{{site_name}}
+    git_url: https://{{ github_pat_ansible_deploy }}@github.com/FullStackIndie/{{site_name}}.git
+    nginx_conf_path: /home/murph/workspace/nginx/conf.d/portfolio/challenges/javascript_challenges.conf
+
+
+- name: Deploy ToDoList
+  import_playbook: ../../../../playbooks/jammy/deploy/static_sites/js_challenges.yml
+  vars: 
+    site_name: ToDoList
+    tmp_path: /tmp/{{site_name}}
+    git_url: https://{{ github_pat_ansible_deploy }}@github.com/FullStackIndie/{{site_name}}.git
+    nginx_conf_path: /home/murph/workspace/nginx/conf.d/portfolio/challenges/javascript_challenges.conf
+

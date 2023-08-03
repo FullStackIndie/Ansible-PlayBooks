@@ -1,8 +1,9 @@
-- hosts: a2hosting,localhost
+- hosts: a2hosting
   become: true
   tasks:
 
     - name: Copy SSHD config
+      become: true
       ansible.builtin.copy:
         src: /home/murph/workspace/configs/server_setup_configs/prod_sshd_config
         dest: /etc/ssh/sshd_config
@@ -10,16 +11,6 @@
         backup: true
         owner: root
         mode: 0644
-
-
-    # - name: Copy Sudoers config
-    #   ansible.builtin.copy:
-    #     src: /home/murph/workspace/configs/server_setup_configs/sudoers
-    #     dest: /etc/sudoers
-    #     force: true
-    #     backup: true
-    #     owner: root
-    #     mode: 0440
 
         
     - name: Restart SSH

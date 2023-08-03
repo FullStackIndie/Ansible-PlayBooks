@@ -2,27 +2,12 @@
   become: true
   vars:
     domains:
-      - blog.fullstackindie.net
-      - critter.fullstackindie.net
-      - identity.fullstackindie.net
-      - gateway.fullstackindie.net
-      - frp.fullstackindie.net
-      - crowdsec.fullstackindie.net
-      - portfolio.fullstackindie.net
-      - admin.fullstackindie.net
-      - syncrify.fullstackindie.net
-      - cadvisor.fullstackindie.net
-      - otel.fullstackindie.net
+      - dev.blog.fullstackindie.net
+      - dev.critter.fullstackindie.net
+      - dev.identity.fullstackindie.net
+      - dev.gateway.fullstackindie.net
 
   tasks:
-    - name: Install Python3
-      apt:
-        pkg:
-          - python3 
-          - python3-venv 
-          - libaugeas0
-        state: latest
-        update_cache: true
 
     - name: Install certbot python package
       ansible.builtin.pip:
@@ -67,16 +52,6 @@
       ignore_errors: true
       loop: "{{ domains }}"
 
-    - name: Remove Apache because it also uses port 80
-      apt:
-        pkg:
-          - apache2
-          - apache2-bin
-          - apache2-data
-          - apache2-doc
-        state: absent
-        purge: true
-        update_cache: true
 
     - name: Make sure Nginx service unit is running
       ansible.builtin.systemd:

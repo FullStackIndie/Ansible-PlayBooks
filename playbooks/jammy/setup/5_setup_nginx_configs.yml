@@ -2,7 +2,11 @@
   become: true
   vars:
     nginx_modules_path: "/usr/lib/nginx/modules"
-    user: murph
+    
+  vars_prompt:
+    - name: user
+      prompt: What is your Ansible Control Node username?
+      private: false
 
   tasks:
     - name: Create required Nginx dirs
@@ -16,26 +20,6 @@
         - { "path": "/etc/nginx/conf.d/streams" }
         - { "path": "/etc/nginx/modules-enabled" }
         - { "path": "/etc/nginx/modules-available" }
-        - { "path": "/etc/nginx/open-telemetry" }
-        - { "path": "/etc/apache2" }
-
-    - name: Copy Otel config for Nginx Open Telemetry
-      ansible.builtin.copy:
-        src: /home/{{ user }}/workspace/nginx/otelcollector/otel_config.toml
-        dest: /etc/nginx/open-telemetry
-        force: true
-        backup: true
-        owner: root
-        mode: 0755
-
-    - name: Copy Otel config for Nginx Open Telemetry
-      ansible.builtin.copy:
-        src: /home/{{ user }}/workspace/nginx/otelcollector/nginx-otel/opentelemetry_module.conf
-        dest: /etc/nginx/open-telemetry
-        force: true
-        backup: true
-        owner: root
-        mode: 0755
 
     - name: Copy Nginx config
       ansible.builtin.copy:
@@ -48,8 +32,8 @@
 
     - name: Copy Nginx configs
       ansible.builtin.copy:
-        src: /home/{{ user }}/workspace/nginx/conf.d/
-        dest: /etc/nginx/conf.d/
+        src: /home/{{ user }}/workspace/nginx/conf.d
+        dest: /etc/nginx/
         force: true
         backup: true
         owner: root
@@ -63,24 +47,18 @@
         owner: root
         mode: 0755
 
-    # - name: Copy Naxsi Rules
+    # - name: Copy Nginx Service
+    #   become: true
     #   ansible.builtin.copy:
-    #     src: /home/{{ user }}/workspace/nginx/naxsi/naxsi.rules
-    #     dest: /etc/nginx
-    #     force: true
+    #     src: /home/{{ user }}/workspace/nginx/nginx.service
+    #     dest: /etc/systemd/system
+    #     force: false
+    #     backup: true
     #     owner: root
     #     mode: 0755
 
-    - name: Copy Nginx Service
-      ansible.builtin.copy:
-        src: /home/{{ user }}/workspace/nginx/nginx.service
-        dest: /etc/systemd/system
-        force: false
-        backup: true
-        owner: root
-        mode: 0755
-
     - name: Copy GeoIp2 Config
+      become: true
       ansible.builtin.copy:
         src: /home/{{ user }}/workspace/nginx/GeoIP.conf
         dest: /etc/GeoIP.conf
@@ -91,9 +69,10 @@
 
     - name: Update GeoIP2
       become: true
-      shell: sudo geoipupdate
+      shell: geoipupdate
 
     - name: Ensure cronjob for MaxMind GeoIp Update
+      become: true
       ansible.builtin.cron:
         name: "check dirs"
         minute: "0"
@@ -101,18 +80,20 @@
         weekday: "1,3"
         job: "/usr/local/bin/geoipupdate"
 
-    - name: Setup cronjob for Ip-Check for Dynamic DNS
-      cron:
-        name: Dynamic DNS
-        job: "/home/murph/workspace/cron-jobs/ip-check.sh"
-        minute: "1" 
-
     - name: Enable service Nginx and ensure it is not masked
+      become: true
       ansible.builtin.systemd:
         name: nginx
         enabled: true
         masked: no
 
-    - name: Just force systemd to reread configs (2.4 and above)
+    - name: Just force systemd to reread configs
+      become: true
       ansible.builtin.systemd:
         daemon_reload: true
+
+    - name: Restart Nginx service
+      become: true
+      ansible.builtin.systemd:
+        state: reloaded
+        name: nginx 

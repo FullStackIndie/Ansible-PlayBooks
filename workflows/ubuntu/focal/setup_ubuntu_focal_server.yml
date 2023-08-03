@@ -1,0 +1,26 @@
+- name: Run multiple playbooks
+  hosts: a2hosting
+
+- name: Setup Server Tools
+  import_playbook: ../../../playbooks/focal/setup/1_server_tools_setup.yml
+
+- name: Setup Server Tools
+  import_playbook: ../../../playbooks/focal/setup/1_server_ssh_&_config_setup.yml
+
+- name: Setup Docker and Docker Compose
+  import_playbook: ../../../playbooks/focal/setup/1_docker_setup.yml
+
+- name: Setup Ufw Firewall
+  import_playbook: ../../../playbooks/focal/setup/2_ufw_setup.yml
+  
+- name: Setup Bashrc
+  import_playbook: ../../../playbooks/focal/setup/2_setup_bashrc.yml
+
+- name: Setup Git User
+  import_playbook: ../../../playbooks/focal/setup/2_setup_git.yml
+
+- name: Setup FRP Proxy
+  import_playbook: ../../../playbooks/focal/setup/2_setup_frp.yml
+
+- name: Setup Doppler
+  import_playbook: ../../../playbooks/focal/setup/2_setup_doppler.yml

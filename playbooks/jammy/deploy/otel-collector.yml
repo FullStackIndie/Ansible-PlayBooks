@@ -1,0 +1,69 @@
+- hosts: a2hosting
+  become: true
+  vars_prompt:
+    - name: user
+      prompt: What is your username?
+      private: false
+  vars:
+    compose_name: telemetry
+    compose_path: /home/{{ user }}/workspace/compose/{{ compose_name }}
+    configs_path: /home/{{ user }}/workspace/configs/telemetry
+    
+  tasks:
+    - name: Create required Otel Collector dirs
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: "{{ user }}"
+        mode: 0755
+      with_items:
+        - { path: "{{ compose_path }}"}
+        - { path: "{{ configs_path }}"}
+
+    - name: Copy Docker Compose
+      ansible.builtin.copy:
+        src: /home/murph/workspace/compose/telemetry/telemetry.yml
+        dest: "{{ compose_path }}/"
+        force: true
+        backup: true
+        owner: "{{ user }}"
+        mode: 0755
+
+    - name: Copy Configs for Docker Containers
+      ansible.builtin.copy:
+        src: "{{ item.path }}"
+        dest: "{{ configs_path }}/"
+        force: true
+        backup: true
+        owner: "{{ user }}"
+      with_items: 
+        - { path: "/home/murph/workspace/configs/otel-collector-contrib-config.yml" }
+        - { path: "/home/murph/workspace/configs/promtail-config.yml" }
+
+    - name: Log into private registry and force re-authorization
+      community.docker.docker_login:
+        registry_url: https://index.docker.io/v2
+        username: "{{ docker_username }}"
+        password: "{{ docker_password }}"
+        reauthorize: true
+
+    - name: Create a Docker network
+      community.docker.docker_network:
+        name: telemetry
+        state: present
+
+    - name: Login into Docker
+      shell: |
+            docker login --username {{ docker_username }} --password {{ docker_password  }}
+
+    - name: Stop exisiting Docker Compose
+      shell: |
+            docker compose -f ./{{ compose_name }}.yml down
+      args:
+        chdir:  "{{ compose_path }}"
+
+    - name: Start Docker Compose 
+      shell: |
+            docker compose -f ./{{ compose_name }}.yml up -d
+      args:
+        chdir:  "{{ compose_path }}"

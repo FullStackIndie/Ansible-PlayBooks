@@ -1,0 +1,35 @@
+- hosts: a2hosting
+  become: true
+  tasks:
+    - name: Remove Apache because it also uses port 80
+      apt:
+        pkg:
+          - apache2
+          - apache2-bin
+          - apache2-data
+          - apache2-doc
+        state: absent
+        purge: true
+        update_cache: true
+
+    - name: Make sure Nginx service unit is running
+      ansible.builtin.systemd:
+        daemon_reload: true
+        state: started
+        name: nginx
+
+    - name: Restart Nginx service
+      ansible.builtin.systemd:
+        state: restarted
+        name: nginx
+
+    - name: Apache Utils for Nginx Basic Auth
+      apt:
+        pkg:
+          - apache2-utils
+        state: latest
+        update_cache: true
+
+    - name: Setup FullStackIndie Admin Dashboard Password
+      become: true
+      command: "sudo htpasswd -c /etc/apache2/.htpasswd {{ fullstackindie_admin_dashboard_password }}"

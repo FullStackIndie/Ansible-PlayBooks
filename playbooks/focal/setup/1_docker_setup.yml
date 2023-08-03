@@ -1,9 +1,7 @@
-- hosts: a2hosting,localhost
+- hosts: a2hosting
   become: true
-  vars_prompt:
-    - name: user
-      prompt: What is your username?
-      private: false
+  vars:
+    user: devops
 
   tasks:
     - name: Install Required Packages for Docker

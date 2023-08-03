@@ -1,0 +1,67 @@
+- hosts: a2hosting
+  become: true
+  vars:
+    nginx_version: 1.22.0
+    ngx_otel_version: 1.0.3
+    ngx_otel_folder: "ngx_otel_{{ ngx_otel_version }}"
+    ngx_otel_install_dir: "/opt"
+
+  tasks:
+    - name: Create required ngx_otel dirs 
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: root
+      loop:
+        - { "path": "{{ ngx_otel_install_dir }}" }
+
+    - name: Create required Nginx/Open Telemetry dirs
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: root
+      loop:
+        - { "path": "/etc/nginx/open-telemetry" }
+
+    - name: Downloading ngx_otel source
+      get_url:
+        url: "https://github.com/open-telemetry/opentelemetry-cpp-contrib/releases/download/webserver%2Fv{{ ngx_otel_version }}/opentelemetry-webserver-sdk-x64-linux.tgz"
+        dest: "{{ ngx_otel_install_dir }}/{{ ngx_otel_folder }}.tar.gz"
+      register: ngx_otel_source
+
+    - name: Unpacking ngx_otel Proxy
+      unarchive:
+        copy: false
+        dest: "{{ ngx_otel_install_dir }}"
+        src: "{{ ngx_otel_source.dest }}"
+        owner: root
+      when: ngx_otel_source.changed
+
+    - name: Copy ngx_otel Module
+      become: true
+      ansible.builtin.copy:
+        src: /opt/opentelemetry-webserver-sdk/WebServerModule/Nginx/{{ nginx_version }}/ngx_http_opentelemetry_module.so
+        dest: /usr/lib/nginx/modules/
+        force: true
+        owner: root
+        mode: 0755
+        remote_src: true
+
+    - name: Copy Nginx Open Telemetry library path file
+      ansible.builtin.copy:
+        src: /home/murph/workspace/otelcollector/otel_library.conf
+        dest: /etc/ld.so.conf.d
+        force: true
+        owner: root
+
+    - name: Copy Nginx Open Telemetry Conf
+      ansible.builtin.copy:
+        src: /home/murph/workspace/otelcollector/opentelemetry_module.conf
+        dest: /etc/nginx/open-telemetry
+        force: true
+        owner: root
+
+    - name: Reload LD Cache
+      become: true
+      command: ldconfig
+      

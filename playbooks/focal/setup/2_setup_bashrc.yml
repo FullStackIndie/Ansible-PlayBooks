@@ -1,0 +1,42 @@
+- hosts: a2hosting
+  become: true
+  vars:
+    user: devops
+
+  tasks:
+    - name: Delete Existing bashrc dirs
+      file:
+        path: "{{ item.path }}"
+        state: absent
+      loop:
+        - { "path": "/home{{ user }}/.bashrc.d" }
+
+    - name: Create bashrc dirs
+      file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: "{{ user }}"
+      loop:
+        - { "path": "/home{{ user }}/.bashrc.d" }
+
+    - name: Copy New .bashrc
+      ansible.builtin.copy:
+        src: /home/murph/workspace/configs/bashrc/.bashrc
+        dest: /home/{{ user }}
+        force: true
+        owner: "{{ user }}"
+        mode: 0644
+
+    - name: Copy Files from bashrc.d
+      ansible.builtin.copy:
+        src: /home/murph/workspace/configs/bashrc/bashrc.d/
+        dest: /home/{{ user }}/.bashrc.d
+        force: true
+        owner: "{{ user }}"
+        mode: 0644
+
+    - name: Source bashrc
+      become: false
+      shell: source /home/{{ user }}/.bashrc
+      args:
+        executable: /bin/bash

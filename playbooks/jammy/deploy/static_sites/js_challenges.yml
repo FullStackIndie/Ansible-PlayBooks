@@ -1,0 +1,84 @@
+- hosts: a2hosting
+  become: true
+  vars:
+    site_name: 
+    tmp_path:  
+    git_url: 
+    nginx_conf_path:
+    # site_name: TacoCat
+    # tmp_path: /tmp/TacoCat
+    # git_url: https://{{ github_pat_ansible_deploy }}@github.com/FullStackIndie/{{site_name}}.git
+    # nginx_conf_path: /home/murph/workspace/nginx/conf.d/portfolio/challenges/javascript_challenges.conf
+
+  tasks:
+    - name: Create required Nginx dirs
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: www-data
+        mode: 0755
+      loop:
+        - { "path": "/var/www/html/js_challenges" }
+
+        
+    - name: Deploy website code from GitHub repositories
+      git:
+        repo: "{{ git_url }}"
+        version: main
+        dest: "{{ tmp_path }}"
+        force: yes
+
+    - name: Upload files to S3
+      become: true
+      shell: |
+        aws s3 sync {{ tmp_path }} s3://fullstackindie-portfolio/{{ site_name }} --follow-symlinks --delete --cache-control 'public,max-age=31536000' \ 
+        --exclude ".git/*" --exclude ".vscode/*" --exclude "*.html" --exclude "*.gitignore" --exclude ".github/*" --exclude "*.txt" --exclude "License/*"
+      environment:
+        - AWS_ACCESS_KEY_ID: "{{ aws_access_key_id }}"
+        - AWS_SECRET_ACCESS_KEY: "{{ aws_secret_access_key }}"
+        - AWS_REGION: "{{ aws_region }}"
+
+    - name: Recursively remove uploaded Directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      with_items:
+        - "{{ tmp_path }}/css"
+        - "{{ tmp_path }}/js"
+        - "{{ tmp_path }}/img"
+        - "{{ tmp_path }}/demo"
+
+    - name: Copy files to /var/www for Nginx
+      ansible.builtin.copy:
+        src: "{{ tmp_path }}/"
+        dest: /var/www/html/js_challenges/{{ site_name }}
+        force: true
+        owner: www-data
+        mode: 0755
+        remote_src: true
+
+
+    - name: Copy config for Nginx 
+      ansible.builtin.copy:
+        src: "{{ nginx_conf_path }}"
+        dest: /etc/nginx/conf.d
+        force: true
+        backup: true
+        owner: root
+        mode: 0755
+
+    - name: Invalidate CloudFront Cache Keys
+      shell: |
+        aws cloudfront create-invalidation --distribution-id {{ cloudfront_portfolio_id }} \
+        --paths "/{{ site_name }}/*"
+      environment:
+        - AWS_ACCESS_KEY_ID: "{{ aws_access_key_id }}"
+        - AWS_SECRET_ACCESS_KEY: "{{ aws_secret_access_key }}"
+        - AWS_REGION: "{{ aws_region }}"
+
+
+    - name: Make sure Nginx service unit is running
+      ansible.builtin.systemd:
+        daemon_reload: true
+        state: reloaded
+        name: nginx

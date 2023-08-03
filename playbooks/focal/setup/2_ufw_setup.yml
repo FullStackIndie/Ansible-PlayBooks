@@ -1,4 +1,4 @@
-- hosts: a2hosting,localhost
+- hosts: a2hosting
   become: true
   vars:
     rules:

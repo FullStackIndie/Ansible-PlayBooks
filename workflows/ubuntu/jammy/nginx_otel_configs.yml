@@ -1,0 +1,9 @@
+- name: Add Nginx Open Telemetry and  Nginx Configs
+  hosts: a2hosting
+
+- name: Setup Otel Module for Nginx
+  import_playbook: ../../../playbooks/jammy/setup/4_setup_nginx_otel.yml
+
+- name: Setup Nginx Server Configs
+  import_playbook: ../../../playbooks/jammy/setup/5_setup_nginx_configs.yml
+

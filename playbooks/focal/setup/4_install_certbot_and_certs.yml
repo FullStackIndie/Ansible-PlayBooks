@@ -1,4 +1,4 @@
-- hosts: a2hosting,localhost
+- hosts: a2hosting
   become: true
   vars:
     domains:
@@ -10,41 +10,17 @@
       - crowdsec.fullstackindie.net
       - portfolio.fullstackindie.net
       - admin.fullstackindie.net
-      - syncrify.fullstackindie.net
-      - cadvisor.fullstackindie.net
-      - otel.fullstackindie.net
 
   tasks:
-    - name: Install Python3
+    - name: Install Certbot
       apt:
         pkg:
-          - python3 
-          - python3-venv 
-          - libaugeas0
+          - certbot
+          - python3-certbot-nginx
         state: latest
         update_cache: true
 
-    - name: Install certbot python package
-      ansible.builtin.pip:
-        name: certbot
-        virtualenv: /opt/certbot/
-        state: latest
-
-    - name: Install certbot-nginx python package
-      ansible.builtin.pip:
-        name: certbot-nginx
-        virtualenv: /opt/certbot/
-        state: latest
-
-    - name: Create symlink for certbot
-      file:
-        src: /opt/certbot/bin/certbot
-        dest: /usr/bin/certbot
-        state: link
-      become: yes
-
     - name: Register certbot
-      become: true
       shell: |
         certbot -n register --agree-tos --email fortheone.dev@gmail.com
         touch /etc/letsencrypt/.registered
@@ -52,7 +28,6 @@
         creates: /etc/letsencrypt/.registered
 
     - name: Setup cronjob for renewal
-      become: true
       cron:
         name: certbot-renewal
         job: "/bin/bash -lc '/usr/local/bin/certbot -q renew'"
@@ -88,3 +63,4 @@
       ansible.builtin.systemd:
         state: restarted
         name: nginx
+

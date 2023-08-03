@@ -1,0 +1,113 @@
+- hosts: a2hosting
+  become: true
+  vars_prompt:
+    - name: user
+      prompt: What is your username?
+      private: false
+  vars:
+    image_name: fullstackindie-blog
+    container_name: fullstackindie-blog
+    compose_name: blog
+    compose_path: /home/{{ user }}/workspace/compose/{{ compose_name }}
+
+  tasks:
+    - name: Create required Nginx dirs
+      ansible.builtin.file:
+        path: "{{ compose_path }}"
+        state: directory
+        owner: "{{ user }}"
+        mode: 0755
+
+    - name: Copy Docker Compose
+      ansible.builtin.copy:
+        src: /home/murph/workspace/compose/blog/blog.yml
+        dest: "{{ compose_path }}/blog.yml"
+        force: true
+        backup: true
+        owner: "{{ user }}"
+        mode: 0755
+
+    - name: Log into private registry and force re-authorization
+      community.docker.docker_login:
+        registry_url: https://index.docker.io/v2
+        username: "{{ docker_username }}"
+        password: "{{ docker_password }}"
+        reauthorize: true
+
+    - name: Create a Docker network
+      community.docker.docker_network:
+        name: telemetry
+        state: present
+
+    - name: Pull Latest Blog Image
+      shell: |
+            docker login --username {{ docker_username }} --password {{ docker_password  }}
+            docker pull {{ docker_username }}/{{ image_name }}:latest
+
+    - name: Stop exisiting Blog with Docker Compose and Doppler
+      shell: |
+            cd {{ compose_path }}
+            export DOPPLER_TOKEN={{ doppler_token_blog }}
+            doppler run --mount docker-compose.yml --mount-template {{ compose_name }}.yml --command 'doppler run -- docker compose down'
+      ignore_errors: true
+
+
+    # - name: Stop exisiting Blog with Docker Compose 
+    #   shell: |
+    #         cd {{ compose_path }}
+    #         docker compose -f ./{{ compose_name }}.yml down
+    #   ignore_errors: true
+
+    - name: Stop exisiting Blog container
+      shell: |
+            docker stop {{ container_name }}
+      ignore_errors: true
+
+    - name: Remove exisiting Blog container
+      shell: |
+            docker rm {{ container_name }}
+      ignore_errors: true
+
+
+    # - name: Start Blog with Docker Compose and Doppler
+    #   shell: |
+    #         export DOPPLER_TOKEN={{ doppler_token_blog }}
+    #         echo 'OTEL_ENDPOINT={{ otel_endpoint }}' > env.prod
+    #         echo 'DOPPLER_TOKEN={{ doppler_token_blog }}' >> env.prod
+    #         doppler run --mount docker-compose.yml --mount-template {{ compose_name }}.yml --command \
+    #         'doppler run -- docker run --restart=always -d --env-file <(doppler secrets download --no-file --format docker) -p 5200:80 -p 5201:443 --network telemetry --name {{ container_name }} {{ docker_username }}/{{ image_name }}:latest'
+    #   args:
+    #     chdir:  "{{ compose_path }}"
+    #     # executable: /bin/bash
+
+
+    # - name: Start Blog with Docker Compose
+    #   shell: |
+    #         export DOPPLER_TOKEN={{ doppler_token_blog }}
+    #         export OTEL_ENDPOINT={{ otel_endpoint }}
+    #         export BLOG_DATABASE_CONNECTION="{{ blog_database_connection }}"
+    #         echo 'OTEL_ENDPOINT={{ otel_endpoint }}' > env.prod
+    #         echo 'DOPPLER_TOKEN={{ doppler_token_blog }}' >> env.prod
+    #         echo 'BLOG_DATABASE_CONNECTION="{{ blog_database_connection }}"' >> env.prod
+    #         docker compose -f ./{{ compose_name }}.yml up -d
+    #   args:
+    #     chdir:  "{{ compose_path }}"
+    #     # executable: /bin/bash
+
+
+    - name: Start Blog with Docker Compose and Doppler
+      shell: |
+            export DOPPLER_TOKEN={{ doppler_token_blog }}
+            echo 'OTEL_ENDPOINT={{ otel_endpoint }}' > env.prod
+            echo 'DOPPLER_TOKEN={{ doppler_token_blog }}' >> env.prod
+            doppler run --mount docker-compose.yml --mount-template {{ compose_name }}.yml --command 'doppler run -- docker compose up -d'
+      args:
+        chdir:  "{{ compose_path }}"
+        # executable: /bin/bash
+
+    # - name: Delete Env file
+    #   ansible.builtin.file:
+    #     path: "{{ compose_path }}/env.prod"
+    #     state: absent
+    #     owner: "{{ user }}"
+    #     mode: 0755

@@ -1,0 +1,20 @@
+- name: Install Nginx, Crowdsec, Crowdsec Firewall Bouncer(iptables), Add Nginx Open Telemetry, Add Nginx Configs
+  hosts: a2hosting
+  vars_prompt:
+    - name: user
+      prompt: What is your username?
+      private: false
+
+- name: Compile Nginx with Brotli, GeoIP2
+  import_playbook: ../../../playbooks/jammy/setup/3_compile_nginx_otel_geoip2_brotli.yml
+  vars:
+    user: "{{ user }}"
+    
+- name: Setup Crowdsec
+  import_playbook: ../../../playbooks/jammy/setup/3_setup_crowdsec.yml
+
+- name: Setup Crowdsec Bouncers
+  import_playbook: ../../../playbooks/jammy/setup/3_setup_crowdsec_bouncers.yml
+
+- name: Setup Certbot
+  import_playbook: ../../../playbooks/jammy/setup/4_install_certbot.yml

@@ -1,0 +1,44 @@
+- hosts: a2hosting,localhost
+  become: true
+  vars_prompt:
+    - name: user
+      prompt: What is your username?
+      private: false
+      
+  tasks:
+
+    - name: Apache Utils for Nginx Basic Auth
+      apt:
+        pkg:
+          - apache2-utils
+        state: latest
+        update_cache: true
+
+    # - name: Setup Passlib for Htpasswd
+    #   become: true
+    #   command: "pip install passlib"
+
+    - name: Install bottle python package
+      ansible.builtin.pip:
+        name: passlib
+        state: latest
+
+    - name: Create Apache dirs
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: root
+        mode: 0755
+      loop:
+        - { "path": "/etc/apache2" }
+
+    - name: Setup FullStackIndie Admin Dashboard Password
+      become: true
+      community.general.htpasswd:
+        create: true
+        mode: 0644
+        owner: root
+        state: present
+        path: /etc/apache2/.htpasswd
+        name: "{{ user }}"
+        password: "{{ fullstackindie_admin_dashboard_password }}"

@@ -1,39 +1,47 @@
 - hosts: a2hosting,localhost
   become: true
-  vars:
-    user: murph
+  vars_prompt:
+    - name: user
+      prompt: What is your username?
+      private: false
 
   tasks:
-    - name: Delete Existing bashrc dirs
-      file:
-        path: "{{ item.path }}"
-        state: absent
-      loop:
-        - { "path": "/home{{ user }}/.bashrc.d" }
-
     - name: Create bashrc dirs
       file:
         path: "{{ item.path }}"
         state: directory
         owner: "{{ user }}"
+        mode: 0755
       loop:
-        - { "path": "/home{{ user }}/.bashrc.d" }
-
-    - name: Copy New .bashrc
-      ansible.builtin.copy:
-        src: /home/{{ user }}/workspace/configs/bashrc/.bashrc
-        dest: /home/{{ user }}
-        force: true
-        owner: "{{ user }}"
-        mode: 0644
+        - { "path": "/home/{{ user }}/.bashrc.d" }
 
     - name: Copy Files from bashrc.d
       ansible.builtin.copy:
-        src: /home/{{ user }}/workspace/configs/bashrc/bashrc.d/
-        dest: /home/{{ user }}/.bashrc.d
+        src: /home/murph/workspace/configs/bashrc/bashrc.d/
+        dest: /home/{{ user }}/.bashrc.d/
         force: true
         owner: "{{ user }}"
         mode: 0644
+        remote_src: false
+
+    - name: Move and Rename Defualt .bashrc
+      ansible.builtin.copy:
+        src: /home/{{ user }}/.bashrc
+        dest: /home/{{ user }}/.bashrc.d/default_bashrc.sh
+        force: true
+        owner: "{{ user }}"
+        mode: 0644
+        remote_src: true
+
+    - name: Copy New .bashrc
+      ansible.builtin.copy:
+        src: /home/murph/workspace/configs/bashrc/.bashrc
+        dest: /home/{{ user }}/.bashrc
+        force: true
+        owner: "{{ user }}"
+        mode: 0644
+        remote_src: false
+
 
     - name: Source bashrc
       become: false

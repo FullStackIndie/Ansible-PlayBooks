@@ -1,12 +1,15 @@
-- hosts: a2hosting,localhost
+- hosts: a2hosting
   become: true
-  vars:
-    user: murph
+  vars_prompt:
+    - name: user
+      prompt: What is your username?
+      private: false
+      
   tasks:
     - name: Download open-appspec
       become: true
       shell: |
-        if [ -e "/home/murph/open-appsec-install" ]; then
+        if [ -e "/home/{{ user }}/open-appsec-install" ]; then
             exit 0
         else
             wget https://downloads.openappsec.io/open-appsec-install && chmod +x open-appsec-install

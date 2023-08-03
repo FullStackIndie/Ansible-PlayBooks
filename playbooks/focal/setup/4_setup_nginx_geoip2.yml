@@ -1,15 +1,5 @@
 - hosts: a2hosting
   become: true
-  vars:
-    domains:
-      - blog.fullstackindie.net
-      - critter.fullstackindie.net
-      - identity.fullstackindie.net
-      - gateway.fullstackindie.net
-      - frp.fullstackindie.net
-      - crowdsec.fullstackindie.net
-      - portfolio.fullstackindie.net
-      - admin.fullstackindie.net
 
   tasks:
     - name: Create required Nginx dirs
@@ -28,7 +18,7 @@
 
     - name: Copy Otel config for Nginx Open Telemetry
       ansible.builtin.copy:
-        src: /home/murph/workspace/nginx/otelcollector/otel_config.toml
+        src: /home/murph/workspace/nginx-otel/opentelemetry_module.conf
         dest: /etc/nginx/open-telemetry
         force: true
         backup: true
@@ -37,7 +27,7 @@
 
     - name: Copy Otel Module for Nginx Open Telemetry
       ansible.builtin.copy:
-        src: /home/murph/workspace/nginx/otelcollector/ngx_http_opentelemetry_module.so
+        src: /home/murph/opentelemetry-webserver-sdk/WebServerModule/Nginx/1.22.0/ngx_http_opentelemetry_module.so
         dest: /usr/lib/nginx/modules
         force: true
         backup: true
@@ -53,14 +43,14 @@
         owner: root
         mode: 0755
 
-    - name: Copy Nginx configs
-      ansible.builtin.copy:
-        src: /home/murph/workspace/nginx/conf.d/
-        dest: /etc/nginx/conf.d/
-        force: true
-        backup: true
-        owner: root
-        mode: 0755
+    # - name: Copy Nginx configs
+    #   ansible.builtin.copy:
+    #     src: /home/murph/workspace/nginx/conf.d/
+    #     dest: /etc/nginx/conf.d/
+    #     force: true
+    #     backup: true
+    #     owner: root
+    #     mode: 0755
 
     - name: Copy Nginx Module Configs
       ansible.builtin.copy:
@@ -70,22 +60,22 @@
         owner: root
         mode: 0755
 
-    - name: Copy Naxsi Rules
-      ansible.builtin.copy:
-        src: /home/murph/workspace/nginx/naxsi/naxsi.rules
-        dest: /etc/nginx
-        force: true
-        owner: root
-        mode: 0755
+    # - name: Copy Naxsi Rules
+    #   ansible.builtin.copy:
+    #     src: /home/murph/workspace/nginx/naxsi/naxsi.rules
+    #     dest: /etc/nginx
+    #     force: true
+    #     owner: root
+    #     mode: 0755
 
-    - name: Copy Nginx Service
-      ansible.builtin.copy:
-        src: /home/murph/workspace/nginx/nginx.service
-        dest: /etc/systemd/system
-        force: false
-        backup: true
-        owner: root
-        mode: 0755
+    # - name: Copy Nginx Service
+    #   ansible.builtin.copy:
+    #     src: /home/murph/workspace/nginx/nginx.service
+    #     dest: /etc/systemd/system
+    #     force: false
+    #     backup: true
+    #     owner: root
+    #     mode: 0755
 
     - name: Copy GeoIp2 Config
       ansible.builtin.copy:
@@ -118,36 +108,6 @@
       ansible.builtin.systemd:
         daemon_reload: true
 
-    - name: Install Certbot
-      apt:
-        pkg:
-          - certbot
-          - python3-certbot-nginx
-        state: latest
-        update_cache: true
-
-    - name: Register certbot
-      shell: |
-        certbot -n register --agree-tos --email fortheone.dev@gmail.com
-        touch /etc/letsencrypt/.registered
-      args:
-        creates: /etc/letsencrypt/.registered
-
-    - name: Setup cronjob for renewal
-      cron:
-        name: certbot-renewal
-        job: "/bin/bash -lc '/usr/local/bin/certbot -q renew'"
-        minute: "0"
-        hour: "14"
-
-    - name: "Get certificates for Copied Nginx Configs and Known/Common Websites with Registered Domains"
-      become: true
-      command: "certbot -n --nginx certonly -d {{ item }}"
-      args:
-        creates: "/etc/letsencrypt/live/{{ item }}"
-      ignore_errors: true
-      loop: "{{ domains }}"
-
     - name: Remove Apache because it also uses port 80
       apt:
         pkg:
@@ -170,13 +130,3 @@
         state: restarted
         name: nginx
 
-    - name: Apache Utils for Nginx Basic Auth
-      apt:
-        pkg:
-          - apache2-utils
-        state: latest
-        update_cache: true
-
-    - name: Setup FullStackIndie Admin Dashboard Password
-      become: true
-      command: "sudo htpasswd -c /etc/apache2/.htpasswd {{ fullstackindie_admin_dashboard_password }}"

@@ -6,11 +6,8 @@
     nginx_install_dir: "/home/{{ user }}/nginx_compiled"
     nginx_sbin_path: "/usr/sbin/nginx"
     nginx_conf_path: "/etc/nginx/nginx.conf"
-    nginx_prefix: "/usr/local/nginx" 
-  vars_prompt:
-    - name: user
-      prompt: What is your username?
-      private: false
+    nginx_prefix: "/usr/local/nginx"
+    user: devops
 
   tasks:
     - name: Remove ondrej/nginx PPA for NGINX Stable with HTTP/2 Repository
@@ -73,7 +70,7 @@
 
     - name: Install Nginx 
       apt:
-        name: nginx=1.22.0-1~jammy
+        name: nginx=1.22.0-1~focal
         state: present
         update_cache: true
       tags: ["setup"]
@@ -200,25 +197,3 @@
         - { "path": "/var/lib/nginx" }
         - { "path": "/var/lib/nginx/body" }
         - { "path": "/var/lib/nginx/fastcgi" }
-
-    - name: Remove Apache because it also uses port 80
-      apt:
-        pkg:
-          - apache2
-          - apache2-bin
-          - apache2-data
-          - apache2-doc
-        state: absent
-        purge: true
-        update_cache: true
-
-    - name: Make sure Nginx service unit is running
-      ansible.builtin.systemd:
-        daemon_reload: true
-        state: started
-        name: nginx
-
-    - name: Restart Nginx service
-      ansible.builtin.systemd:
-        state: restarted
-        name: nginx

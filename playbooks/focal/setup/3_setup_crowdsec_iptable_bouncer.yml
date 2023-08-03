@@ -1,66 +1,48 @@
-- hosts: a2hosting,localhost
+- hosts: a2hosting
   become: true
-  vars:
-    user: murph
+  vars_prompt:
+    - name: user
+      prompt: What is your username?
+      private: false
+
   tasks:
-    - name: Uninstall  Nginx and Crowdsec for clean install
+    - name: Uninstall Crowdsec for clean install
       ansible.builtin.apt:
         pkg:
           - crowdsec-firewall-bouncer-iptables
           - crowdsec-firewall-bouncer-nftables
           - crowdsec-nginx-bouncer
           - crowdsec
-          - nginx
-          - nginx-full
-          - nginx-common
-          - nginx-extras
         state: absent
         update_cache: true
 
-    - name: Delete Official Nginx apt list
-      ansible.builtin.file:
-        path: /etc/apt/sources.list.d/nginx.list
+    - name: A Remove ondrej/nginx PPA for NGINX Stable with HTTP/2 Repository
+      apt_repository:
+        repo: ppa:ondrej/nginx
         state: absent
-
-    - name: Delete Official Nginx apt preference
-      ansible.builtin.file:
-        path: /etc/apt/preferences.d/99nginx
-        state: absent
-        
+        update_cache: true
 
     - name: Add Crowdsec Repo's
       become: true
       shell: curl -s https://packagecloud.io/install/repositories/crowdsec/crowdsec/script.deb.sh | sudo bash
       args:
         chdir: /home/{{ user }}/
-        
-    # - name: Add PPA for NGINX Stable with HTTP/2 Repository
-    #   apt_repository:
-    #     repo: ppa:ondrej/nginx
-    #     state: present
-    #     update_cache: true
 
-    # - name: Install Crowdsec (with Nginx 1.24.0) and Bouncer Dependencies
-    #   ansible.builtin.apt:
-    #     pkg:
-    #       - libnginx-mod-http-lua 
-    #       - crowdsec
-    #       - lua5.1 
-    #       - luarocks 
-    #       - gettext-base 
-    #       - lua-cjson
-    #     state: latest
-    #     update_cache: true
-
-    - name: Install Crowdsec Bouncers
+    - name: Install Crowdsec
       ansible.builtin.apt:
         pkg:
-          - crowdsec-firewall-bouncer-nftables
-          # - crowdsec-nginx-bouncer
+          - crowdsec
+        state: latest
+        update_cache: true 
+
+    - name: Install Crowdsec Firewall Bouncer
+      ansible.builtin.apt:
+        pkg:
+          - crowdsec-firewall-bouncer-iptables
         state: latest
         update_cache: true
 
-    - name: Delete Defualt Nginx Modules
+    - name: Delete Defualt Nginx Lua Modules
       ansible.builtin.file:
         path: "{{ item.path }}"
         state: absent
@@ -110,48 +92,11 @@
 #cscli collections install LePresidente/grafana
 
 
-    - name: A Remove ondrej/nginx PPA for NGINX Stable with HTTP/2 Repository
-      apt_repository:
-        repo: ppa:ondrej/nginx
-        state: absent
-        update_cache: true
-
-    - name: Import an official nginx signing key so apt could verify the packages authenticity
-      become: true
-      shell: curl https://nginx.org/keys/nginx_signing.key | gpg --dearmor | sudo tee /usr/share/keyrings/nginx-archive-keyring.gpg >/dev/null
-
-    - name: Verify that the downloaded file contains the proper key
-      become: true
-      shell: gpg --dry-run --quiet --no-keyring --import --import-options import-show /usr/share/keyrings/nginx-archive-keyring.gpg
-
-    - name: Set up the apt repository for stable nginx packages
-      become: true
-      shell: >
-        echo "deb [signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] http://nginx.org/packages/ubuntu `lsb_release -cs` nginx" 
-        | sudo tee /etc/apt/sources.list.d/nginx.list
-
-    - name: Copy Official Nginx Package Preferences 
-      ansible.builtin.copy:
-        src: /home/{{ user }}/workspace/nginx/99nginx
-        dest: /etc/apt/preferences.d/99nginx
-        force: true
-        backup: false
-        owner: root
-        mode: 0644
-
-    - name: Install Nginx 
-      apt:
-        pkg:
-          - nginx
-        state: latest
-        update_cache: true
-      tags: ["setup"]
-
-    - name: Restart Nginx service
-      become: true
-      ansible.builtin.systemd:
-        state: reloaded
-        name: crowdsec
+    # - name: Restart Nginx service
+    #   become: true
+    #   ansible.builtin.systemd:
+    #     state: reloaded
+    #     name: crowdsec
 
     - name: Restart Crowdsec service
       ansible.builtin.systemd:

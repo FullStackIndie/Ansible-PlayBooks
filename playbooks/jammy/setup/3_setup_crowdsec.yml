@@ -1,35 +1,16 @@
 - hosts: a2hosting,localhost
   become: true
-  vars:
-    user: murph
+  vars_prompt:
+    - name: user
+      prompt: What is your username?
+      private: false
+      
   tasks:
-    - name: Uninstall  Nginx and Crowdsec for clean install
+
+    - name: Uninstall Crowdsec and Bouncers for clean install
       ansible.builtin.apt:
         pkg:
-          - crowdsec-firewall-bouncer-iptables
-          - crowdsec-firewall-bouncer-nftables
-          - crowdsec-nginx-bouncer
           - crowdsec
-          - nginx
-          - nginx-full
-          - nginx-common
-          - nginx-extras
-        state: absent
-        update_cache: true
-
-    - name: Delete Official Nginx apt list
-      ansible.builtin.file:
-        path: /etc/apt/sources.list.d/nginx.list
-        state: absent
-
-    - name: Delete Official Nginx apt preference
-      ansible.builtin.file:
-        path: /etc/apt/preferences.d/99nginx
-        state: absent
-        
-    - name: A Remove ondrej/nginx PPA for NGINX Stable with HTTP/2 Repository
-      apt_repository:
-        repo: ppa:ondrej/nginx
         state: absent
         update_cache: true
 
@@ -39,20 +20,12 @@
       args:
         chdir: /home/{{ user }}/
         
-    - name: Install Crowdsec Firewall Bouncer
+    - name: Install Crowdsec
       ansible.builtin.apt:
         pkg:
-          - crowdsec-firewall-bouncer-nftables
+          - crowdsec
         state: latest
         update_cache: true
-
-    - name: Delete Defualt Nginx Modules
-      ansible.builtin.file:
-        path: "{{ item.path }}"
-        state: absent
-      loop:
-        - { "path": "/etc/nginx/modules-enabled/10-mod-http-ndk.conf" }
-        - { "path": "/etc/nginx/modules-enabled/50-mod-http-lua.conf" }
 
 
     - name: Setup and Start Crowdsec Local Metrics Dashboard
@@ -95,21 +68,14 @@
         - cscli parsers install crowdsecurity/dateparse-enrich
 #cscli collections install LePresidente/grafana
 
+    - name: Enable Crowdsec Bash Completion
+      become: true
+      shell: cscli completion bash | tee /etc/bash_completion.d/cscli
 
-    # - name: Restart Nginx service
-    #   become: true
-    #   ansible.builtin.systemd:
-    #     state: reloaded
-    #     name: crowdsec
 
     - name: Restart Crowdsec service
       ansible.builtin.systemd:
         daemon_reload: true
         state: restarted
         name: crowdsec
-        
-    - name: Restart Crowsec Firewall Bouncer
-      ansible.builtin.systemd:
-        daemon_reload: true
-        state: restarted
-        name: crowdsec-firewall-bouncer
+
