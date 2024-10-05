@@ -1,0 +1,23 @@
+- hosts: a2hosting
+  become: true
+
+  tasks:
+    - name: Delete unnecessary tar.gz folders and backups
+      shell: sudo rm -r {{ item.path }}
+      loop:
+        - { path: "/home/devops/nginx_compiled/*.gz" }
+        - { path: "/usr/local/nginx/modules/*.so.old" }
+        - { path: "/usr/lib/nginx/modules/*.so.old" }
+        - { path: "/opt/*.gz" }
+        - { path: "/opt/frp/*.gz" }
+        - { path: "/opt/frp/frp_*_linux_amd64" }
+        - { path: "/opt/frp/frps.toml.*" }
+        - { path: "/opt/frp/frpc" }
+        - { path: "/etc/nginx/nginx.conf.*" }
+        - { path: "/etc/nginx/conf.d/*.conf.*" }
+        - { path: "/etc/nginx/conf.d/streams/*.conf.*" }
+        - { path: "/etc/nginx/modules-enabled/*.conf.*" }
+        - { path: "/etc/nginx/open-telemetry/*.toml.*" }
+        - { path: "/home/devops/workspace/compose/*/*.yml.*" }
+        - { path: "/home/devops/workspace/configs/*/*.yml.*" }
+        - { path: "/home/devops/workspace/configs/*/*.alloy.*" }

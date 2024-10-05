@@ -1,4 +1,4 @@
-- hosts: a2hosting
+- hosts: a2hosting, localhost
   become: true
 
   tasks:

@@ -1,7 +1,6 @@
 - hosts: a2hosting
   become: true
   tasks:
-
     - name: Copy Otel config for Nginx Open Telemetry
       ansible.builtin.copy:
         src: /home/murph/workspace/nginx/otelcollector/otel_config.toml
@@ -63,7 +62,6 @@
         owner: root
         mode: 0755
 
-
     - name: Copy GeoIp2 Config
       ansible.builtin.copy:
         src: /home/murph/workspace/nginx/GeoIP.conf
@@ -98,7 +96,7 @@
     - name: Setup cronjob for renewal
       cron:
         name: certbot-renewal
-        job: "/bin/bash -lc '/usr/local/bin/certbot -q renew'"
+        job: "/bin/bash -lc '/usr/bin/certbot -q renew'"
         minute: "0"
         hour: "14"
 

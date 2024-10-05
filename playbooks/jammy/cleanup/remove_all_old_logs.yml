@@ -1,0 +1,15 @@
+- hosts: a2hosting
+  become: true
+# Requires system reboot 
+  tasks:
+
+
+    - name: Delete unnecessary tar.gz folders and backups
+      shell: sudo rm -r {{ item.path }}
+      loop:
+        - { path: "/var/log/.*" }
+        - { path: "/var/log/*/.*" }
+
+    - name: Rebooting machine, neccessary to recreate auth.log
+      ansible.builtin.reboot:
+        msg: "Rebooting machine in 5 seconds"

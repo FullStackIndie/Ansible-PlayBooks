@@ -8,14 +8,14 @@
       prompt: What is the environment for uploading to AWS S3? [dev, prod] (n for no-op)
       private: false   
   vars:
-    image_name: fullstackindie-blog
-    container_name: fullstackindie-blog
-    compose_name: blog
+    image_name: fullstackidentity
+    container_name: fullstackidentity
+    compose_name: identity
     compose_path: /home/{{ user }}/workspace/compose/{{ compose_name }}
-    site_name: Blog
-    tmp_path:  /tmp/Blog
+    site_name: FullStackIdentity
+    tmp_path:  /tmp/FullStackIdentity
     git_url: https://{{ github_pat_ansible_deploy }}@github.com/FullStackIndieLLC/{{site_name}}.git
-    nginx_conf_path: /home/murph/workspace/nginx/conf.d/blog.conf
+    nginx_conf_path: /home/murph/workspace/nginx/conf.d/identity.conf
 
   tasks:
     - name: Create required Nginx dirs
@@ -37,7 +37,7 @@
     - name: Upload files to S3
       become: true
       shell: |
-        aws s3 sync {{ tmp_path }}/FullStackIndieBlog/wwwroot s3://{{ env }}-{{ container_name }}/static --follow-symlinks --delete --cache-control 'public,max-age=31536000' \ 
+        aws s3 sync {{ tmp_path }}/{{ site_name }}/wwwroot s3://{{ env }}-{{ container_name }}/static --follow-symlinks --delete --cache-control 'public,max-age=31536000' \ 
         --exclude ".git/*" --exclude ".vscode/*" --exclude "*.html" --exclude "*.gitignore" --exclude ".github/*" --exclude "*.txt" --exclude "License/*"
       environment:
         - AWS_ACCESS_KEY_ID: "{{ aws_access_key_id }}"
@@ -56,7 +56,7 @@
 
     - name: Invalidate Dev CloudFront Cache Keys
       shell: |
-        aws cloudfront create-invalidation --distribution-id {{ dev_cloudfront_blog_id }} \
+        aws cloudfront create-invalidation --distribution-id {{ dev_cloudfront_identity_id }} \
         --paths "/{{ site_name }}/static/*"
       environment:
         - AWS_ACCESS_KEY_ID: "{{ aws_access_key_id }}"
@@ -64,10 +64,9 @@
         - AWS_REGION: "{{ aws_region }}"
       when: env != "n" and env == "dev"
 
-
     - name: Invalidate Prod CloudFront Cache Keys
       shell: |
-        aws cloudfront create-invalidation --distribution-id {{ prod_cloudfront_blog_id }} \
+        aws cloudfront create-invalidation --distribution-id {{ prod_cloudfront_identity_id }} \
         --paths "/{{ site_name }}/static/*"
       environment:
         - AWS_ACCESS_KEY_ID: "{{ aws_access_key_id }}"
@@ -144,3 +143,5 @@
         state: absent
         owner: "{{ user }}"
         mode: 0755
+
+  

@@ -30,7 +30,7 @@
     - name: Setup cronjob for renewal
       cron:
         name: certbot-renewal
-        job: "/bin/bash -lc '/usr/local/bin/certbot -q renew'"
+        job: "/bin/bash -lc '/usr/bin/certbot -q renew'"
         minute: "0"
         hour: "14"
 
@@ -63,4 +63,3 @@
       ansible.builtin.systemd:
         state: restarted
         name: nginx
-

@@ -1,8 +1,8 @@
 - hosts: a2hosting
   become: true
   vars:
-    nginx_version: 1.22.0
-    ngx_otel_version: 1.0.3
+    nginx_version: 1.26.0
+    ngx_otel_version: 1.1.0
     ngx_otel_folder: "ngx_otel_{{ ngx_otel_version }}"
     ngx_otel_install_dir: "/opt"
 
@@ -64,4 +64,16 @@
     - name: Reload LD Cache
       become: true
       command: ldconfig
+
+      
+    - name: Make sure Nginx service unit is running
+      ansible.builtin.systemd:
+        daemon_reload: true
+        state: started
+        name: nginx
+
+    - name: Restart Nginx service
+      ansible.builtin.systemd:
+        state: restarted
+        name: nginx
       

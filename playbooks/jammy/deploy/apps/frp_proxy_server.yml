@@ -23,6 +23,13 @@
       loop:
         - { "path": "{{ frp_install_dir }}" }
 
+
+    - name: Make sure FRP Proxy service unit is stopped 
+      ansible.builtin.systemd:
+        daemon_reload: true
+        state: stopped
+        name: "{{ frp_type }}"
+
     - name: Downloading FRP source
       get_url:
         url: "https://github.com/fatedier/frp/releases/download/v{{ frp_version }}/frp_{{ frp_version }}_linux_amd64.tar.gz"
@@ -61,7 +68,7 @@
 
     - name: Copy FRP Proxy Configs
       ansible.builtin.copy:
-        src: /home/murph/workspace/frp/{{ frp_type }}.ini
+        src: /home/murph/workspace/frp/{{ frp_type }}.toml
         dest: "{{ frp_install_dir }}"
         force: true
         backup: true

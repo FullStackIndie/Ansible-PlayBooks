@@ -8,7 +8,6 @@
       - dev.gateway.fullstackindie.net
 
   tasks:
-
     - name: Install certbot python package
       ansible.builtin.pip:
         name: certbot
@@ -40,7 +39,7 @@
       become: true
       cron:
         name: certbot-renewal
-        job: "/bin/bash -lc '/usr/local/bin/certbot -q renew'"
+        job: "/bin/bash -lc '/usr/bin/certbot -q renew'"
         minute: "0"
         hour: "14"
 
@@ -51,7 +50,6 @@
         creates: "/etc/letsencrypt/live/{{ item }}"
       ignore_errors: true
       loop: "{{ domains }}"
-
 
     - name: Make sure Nginx service unit is running
       ansible.builtin.systemd:

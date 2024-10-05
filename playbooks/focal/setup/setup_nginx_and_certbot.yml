@@ -76,7 +76,6 @@
         owner: root
         mode: 0755
 
-
     - name: Copy Nginx Service
       ansible.builtin.copy:
         src: /home/murph/workspace/nginx/nginx.service
@@ -135,15 +134,15 @@
     - name: Setup cronjob for renewal
       cron:
         name: certbot-renewal
-        job: "/bin/bash -lc '/usr/local/bin/certbot -q renew'"
+        job: "/bin/bash -lc '/usr/bin/certbot -q renew'"
         minute: "0"
         hour: "14"
 
-    - name: 'Get certificates for Copied Nginx Configs and Known/Common Websites with Registered Domains'
+    - name: "Get certificates for Copied Nginx Configs and Known/Common Websites with Registered Domains"
       become: true
-      command: 'certbot -n --nginx certonly -d {{ item }}'
+      command: "certbot -n --nginx certonly -d {{ item }}"
       args:
-        creates: '/etc/letsencrypt/live/{{ item }}'
+        creates: "/etc/letsencrypt/live/{{ item }}"
       ignore_errors: true
       loop: "{{ domains }}"
 
@@ -178,4 +177,4 @@
 
     - name: Setup FullStackIndie Admin Dashboard Password
       become: true
-      command: 'sudo htpasswd -c /etc/apache2/.htpasswd {{ fullstackindie_admin_dashboard_password }}'
+      command: "sudo htpasswd -c /etc/apache2/.htpasswd {{ fullstackindie_admin_dashboard_password }}"

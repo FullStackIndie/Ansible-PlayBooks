@@ -1,2 +1,3 @@
 servers/localhost/group_vars/vault.yml
 servers/a2hosting/group_vars/vault.yml
+servers/group_vars/a2hosting/vault.yml

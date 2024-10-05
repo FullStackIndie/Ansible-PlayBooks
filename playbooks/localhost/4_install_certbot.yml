@@ -1,7 +1,7 @@
 - hosts: a2hosting,localhost
   become: true
   vars:
-    user: murph 
+    user: murph
     domains:
       - dev.blog.fullstackindie.net
       - dev.critter.fullstackindie.net
@@ -27,7 +27,7 @@
     - name: Setup cronjob for renewal
       cron:
         name: certbot-renewal
-        job: "/bin/bash -lc '/usr/local/bin/certbot -q renew'"
+        job: "/bin/bash -lc '/usr/bin/certbot -q renew'"
         minute: "0"
         hour: "14"
 

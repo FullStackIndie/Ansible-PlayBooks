@@ -1,12 +1,13 @@
 - hosts: a2hosting
   become: true
   vars:
-    nginx_version: nginx-1.22.0 # Required version to use Nginx OpenTelemetry Contrib
+    nginx_otel_compatible_version: 1.26.0 # Required version to use Nginx OpenTelemetry Contrib
+    nginx_version: nginx-{{ nginx_otel_compatible_version }}
     nginx_tarball_url: "http://nginx.org/download/{{ nginx_version }}.tar.gz"
     nginx_install_dir: "/home/{{ user }}/nginx_compiled"
     nginx_sbin_path: "/usr/sbin/nginx"
     nginx_conf_path: "/etc/nginx/nginx.conf"
-    nginx_prefix: "/usr/local/nginx" 
+    nginx_prefix: "/usr/local/nginx"
   vars_prompt:
     - name: user
       prompt: What is your username?
@@ -19,6 +20,13 @@
         state: absent
         update_cache: true
 
+    - name: Hold nginx package from being auto-updated
+      dpkg_selections:
+        name: "{{ item }}"
+        selection: install
+      loop: 
+        - nginx
+
     - name: Uninstall Nginx for clean install
       ansible.builtin.apt:
         pkg:
@@ -27,21 +35,18 @@
           - nginx-common
           - nginx-extras
         state: absent
-        update_cache: true
-
 
     - name: Install Required Packages for Official Nginx Download
       apt:
         pkg:
-          - curl 
-          - gnupg2 
-          - ca-certificates 
-          - lsb-release 
+          - curl
+          - gnupg2
+          - ca-certificates
+          - lsb-release
           - ubuntu-keyring
         state: latest
         update_cache: true
       tags: ["setup"]
-
 
     - name: Import an official nginx signing key so apt could verify the packages authenticity
       become: true
@@ -57,7 +62,7 @@
         echo "deb [signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] http://nginx.org/packages/ubuntu `lsb_release -cs` nginx" 
         | sudo tee /etc/apt/sources.list.d/nginx.list
 
-    - name: Copy Official Nginx Package Preferences 
+    - name: Copy Official Nginx Package Preferences
       ansible.builtin.copy:
         src: /home/murph/workspace/nginx/99nginx
         dest: /etc/apt/preferences.d/99nginx
@@ -70,26 +75,36 @@
       apt:
         update_cache: true
       tags: ["setup"]
+ 
+    # - name: Install Nginx
+    #   apt:
+    #     # name: nginx={{ nginx_otel_compatible_version }}-1~jammy
+    #     # state: build-dep
+    #     # update_cache: true
+    #   tags: ["setup"]
 
-    - name: Install Nginx 
-      apt:
-        name: nginx=1.22.0-1~jammy
-        state: present
-        update_cache: true
-      tags: ["setup"]
-
-    - name: Install Required Packages to Compile Nginx with OpenSSL, PCRE, and Zlib
+    - name: Install Required Packages to Compile Nginx with OpenSSL, PCRE, and Zlib and Brotli
       apt:
         pkg:
           - build-essential
-          - libpcre3 
-          - libpcre3-dev 
-          - zlib1g 
-          - zlib1g-dev 
+          - libpcre3
+          - libpcre3-dev
+          - zlib1g
+          - zlib1g-dev
           - libssl-dev
+          - libbrotli-dev
         state: latest
         update_cache: true
       tags: ["setup"]
+
+    - name: Clean Nginx dirs to prepare for new modules
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      loop:
+        - { "path": "{{ nginx_install_dir }}" }
+        - { "path": "{{ nginx_install_dir }}/geoip2" }
+        - { "path": "{{ nginx_install_dir }}/brotli" }
 
     - name: Create required Nginx dirs to Compile needed Modules
       ansible.builtin.file:
@@ -133,7 +148,6 @@
         update_cache: true
       tags: ["max-mind"]
 
-
     - name: Clone GeoIP2 repository
       git:
         repo: "https://github.com/leev/ngx_http_geoip2_module.git"
@@ -141,7 +155,6 @@
         clone: yes
         update: yes
       register: geoip2_source
-
 
     - name: Unpacking NGINX
       unarchive:
@@ -160,11 +173,10 @@
 
     - name: Configuring NGINX source with custom modules
       become: true
-      shell: ./configure --with-cc-opt='-g -O2 -flto=auto -ffat-lto-objects -flto=auto -ffat-lto-objects -fstack-protector-strong -Wformat -Werror=format-security -fPIC -Wdate-time -D_FORTIFY_SOURCE=2' --with-ld-opt='-Wl,-Bsymbolic-functions -flto=auto -ffat-lto-objects -flto=auto -Wl,-z,relro -Wl,-z,now -fPIC' --prefix=/usr/share/nginx --sbin-path=/usr/sbin/nginx  --conf-path=/etc/nginx/nginx.conf --http-log-path=/var/log/nginx/access.log --error-log-path=/var/log/nginx/error.log --lock-path=/var/lock/nginx.lock --pid-path=/run/nginx.pid --modules-path=/usr/lib/nginx/modules --http-client-body-temp-path=/var/lib/nginx/body --http-fastcgi-temp-path=/var/lib/nginx/fastcgi --http-proxy-temp-path=/var/lib/nginx/proxy --http-scgi-temp-path=/var/lib/nginx/scgi --http-uwsgi-temp-path=/var/lib/nginx/uwsgi --with-compat --with-debug --with-pcre-jit --with-http_ssl_module --with-http_stub_status_module --with-http_realip_module --with-http_auth_request_module --with-http_v2_module --with-http_dav_module --with-http_slice_module --with-threads  --add-dynamic-module=../geoip2 --with-http_addition_module --with-http_gunzip_module --with-http_gzip_static_module --with-http_sub_module --with-stream=dynamic --with-stream_ssl_module --add-dynamic-module=../brotli 
-      args:  
+      shell: ./configure --with-cc-opt='-g -O2 -flto=auto -ffat-lto-objects -flto=auto -ffat-lto-objects -fstack-protector-strong -Wformat -Werror=format-security -fPIC -Wdate-time -D_FORTIFY_SOURCE=2' --with-ld-opt='-Wl,-Bsymbolic-functions -flto=auto -ffat-lto-objects -flto=auto -Wl,-z,relro -Wl,-z,now -fPIC' --prefix=/usr/share/nginx --sbin-path=/usr/sbin/nginx  --conf-path=/etc/nginx/nginx.conf --http-log-path=/var/log/nginx/access.log --error-log-path=/var/log/nginx/error.log --lock-path=/var/lock/nginx.lock --pid-path=/run/nginx.pid --modules-path=/usr/lib/nginx/modules --http-client-body-temp-path=/var/lib/nginx/body --http-fastcgi-temp-path=/var/lib/nginx/fastcgi --http-proxy-temp-path=/var/lib/nginx/proxy --http-scgi-temp-path=/var/lib/nginx/scgi --http-uwsgi-temp-path=/var/lib/nginx/uwsgi --with-compat --with-debug --with-pcre-jit --with-http_ssl_module --with-http_stub_status_module --with-http_realip_module --with-http_auth_request_module --with-http_v2_module --with-http_dav_module --with-http_slice_module --with-threads  --add-dynamic-module=../geoip2 --with-http_addition_module --with-http_gunzip_module --with-http_gzip_static_module --with-http_sub_module --with-stream=dynamic --with-stream_ssl_module --add-dynamic-module=../brotli
+      args:
         chdir: "{{ nginx_install_dir }}/{{ nginx_version }}"
       register: nginx_configured
-
 
     - name: Installing NGINX
       become: true
@@ -182,7 +194,6 @@
           - "70*"
           - "10*"
       register: module_confs
-
 
     - name: Delete Default Nginx Modules
       ansible.builtin.file:
@@ -212,6 +223,14 @@
         purge: true
         update_cache: true
 
+
+    - name: Enable service Nginx and ensure it is not masked
+      become: true
+      ansible.builtin.systemd:
+        name: nginx
+        enabled: true
+        masked: no
+
     - name: Make sure Nginx service unit is running
       ansible.builtin.systemd:
         daemon_reload: true
@@ -222,3 +241,11 @@
       ansible.builtin.systemd:
         state: restarted
         name: nginx
+
+        
+    - name: Hold nginx package from being auto-updated
+      dpkg_selections:
+        name: "{{ item }}"
+        selection: hold
+      loop: 
+        - nginx

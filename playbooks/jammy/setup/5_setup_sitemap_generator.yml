@@ -11,54 +11,7 @@
         owner: www-data
         mode: 0755
       loop:
-        - { "path": "/var/www/html/portfolio/Portfolio" }
-        - { "path": "/var/www/html/portfolio/Portfolio/SEO" }
         - { "path": "/opt/sitemap" }
-
-    - name: Deploy website code from GitHub repositories
-      git:
-        repo: https://{{ github_pat_ansible_deploy }}@github.com/FullStackIndie/Portfolio.git
-        version: main
-        dest: /tmp/portfolio
-        force: yes
-
-    - name: Upload files to S3
-      become: true
-      shell: |
-        aws s3 sync /tmp/portfolio s3://fullstackindie-portfolio/Portfolio --follow-symlinks --delete --cache-control 'public,max-age=31536000' \ 
-        --exclude ".git/*" --exclude ".vscode/*" --exclude "*.html" --exclude "*.gitignore" --exclude ".github/*" --exclude "*.txt" --exclude "License/*"
-      environment:
-        - AWS_ACCESS_KEY_ID: "{{ aws_access_key_id }}"
-        - AWS_SECRET_ACCESS_KEY: "{{ aws_secret_access_key }}"
-        - AWS_REGION: "{{ aws_region }}"
-
-    - name: Recursively remove uploaded Directories
-      ansible.builtin.file:
-        path: "{{ item }}"
-        state: absent
-      with_items:
-        - "/tmp/portfolio/css"
-        - "/tmp/portfolio/js"
-        - "/tmp/portfolio/img"
-        - "/tmp/portfolio/demo"
-
-    - name: Copy files to /var/www for Nginx
-      ansible.builtin.copy:
-        src: /tmp/portfolio/
-        dest: /var/www/html/portfolio/Portfolio/
-        force: true
-        owner: www-data
-        mode: 0755
-        remote_src: true
-
-    - name: Copy config for Nginx
-      ansible.builtin.copy:
-        src: /home/murph/workspace/nginx/conf.d/portfolio.conf
-        dest: /etc/nginx/conf.d
-        force: true
-        backup: true
-        owner: root
-        mode: 0755
 
     - name: Downloading SiteMap-Generator source
       get_url:
